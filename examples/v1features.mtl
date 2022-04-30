@@ -1,0 +1,26 @@
+## v1features.mtl
+# MattyLang v1 Source
+
+## Intrinsic Reference
+# $inf: Real
+# $real2string: (Real) -> String
+# $print: (String) -> Nil
+
+def addOne(x: Real) {
+	return x + 1
+}
+
+def callMany(f: (Real) -> Real, x0: Real, n: Real) {
+	while (n > 0) {
+		x0 = f(x0)
+		n = n - 1
+	}
+	return x0
+}
+
+def var = 0
+def r2s = $real2string
+$print(r2s(var)) # 0
+var = addOne(var)
+$print(r2s(var)) # 1
+$print(r2s($inf)) # inf
