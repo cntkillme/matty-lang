@@ -1,0 +1,78 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "MattyLang",
+	"scopeName": "source.mtl",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#types"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#numbers"
+		},
+		{
+			"include": "#operators"
+		}
+	],
+	"repository": {
+		"comments": {
+			"name": "comment.line.mtl",
+			"begin": ";",
+			"end": "\n"
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.mtl",
+				"match": "\\b(def|if|elseif|else|while|break|continue|pass|return)\\b"
+			}]
+		},
+		"types": {
+			"patterns": [{
+				"name": "storage.type.mtl",
+				"match": "\\b(Nil|Bool|Real|String)\\b"
+			}]
+		},
+		"constants": {
+			"patterns": [{
+				"name": "constant.language.mtl",
+				"match": "\\b(nil|true|false)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.mtl",
+			"begin": "([\"'])",
+			"end": "\\1",
+			"patterns": [
+				{
+					"name": "constant.character.escape.mtl",
+					"match": "\\\\[xX][0-9A-Fa-f][0-9A-Fa-f]"
+				},
+				{
+					"name": "constant.character.escape.mtl",
+					"match": "\\\\[\"'\\\\0fnrtv]"
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [{
+				"name": "constant.numeric.mtl",
+				"match": "\\b\\d+(\\.\\d+)?\\b"
+			}]
+		},
+		"operators": {
+			"name": "keyword.operator.mtl",
+			"match": "[\\=\\!\\+\\-\\*\\/\\%\\<\\>\\|\\&]"
+		}
+	}
+}

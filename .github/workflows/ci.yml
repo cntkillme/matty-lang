@@ -1,0 +1,22 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip-ci]')"
+    steps:
+    - uses: actions/checkout@v3
+    - uses: leafo/gh-actions-lua@v9
+    - uses: leafo/gh-actions-luarocks@v4
+    - name: Install dependencies
+      run: |
+        luarocks install luacheck
+        luarocks install cluacov
+    - name: check
+      run: luacheck .
+    - name: test
+      run: lua -lluacov test/init.lua
+    - name: codecov
+      run: bash <(curl -s https://codecov.io/bash)
