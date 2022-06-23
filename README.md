@@ -31,6 +31,7 @@ This plan may change as development progresses.
 - String escape sequences
 - Compound assignment statement
 - Intrinsic expansion ($pi, $sin, $substr, etc)
+- Compilation
 
 ### MattyLang v3
 - Labeled break and continue statements

@@ -2,9 +2,9 @@
     "name": "mtl",
     "displayName": "MattyLang",
     "description": "Matty Programming Language",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "engines": {
-        "vscode": "^1.63.0"
+        "vscode": "^1.0.0"
     },
     "categories": [
         "Programming Languages"

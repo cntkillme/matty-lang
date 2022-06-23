@@ -1,0 +1,56 @@
+program = statement_list EOF;
+statement_list = { statement };
+block = "{" statement_list "}";
+
+statement = function_definition
+          | variable_definition
+          | return_statement
+          | if_statement
+          | while_statement
+          | break_statement
+          | continue_statement
+          | call_expression
+          | assignment_expression
+          ;
+
+function_definition = "def" identifier "(" declaration_list ")" block;
+variable_definition = "def" identifier "=" expression;
+return_statement = "return" [expression];
+if_statement = "if" "(" expression ")" block { "elseif" "(" expression ")" block } ["else" "(" expression ")" block];
+while_statement = "while" "(" expression ")" block;
+break_statement = "break";
+continue_statement = "continue";
+declaration_list = [identifier ":" type { "," identifier ":" type } [","]];
+
+expression = "(" expression ")"
+           | nil_literal
+           | bool_literal
+           | real_literal
+           | string_literal
+           | qualified_name
+           | call_expression
+           | assignment_expression
+           | unary_expression
+           | binary_expression
+           ;
+expression_list = [expression { "," expression } [","]];
+
+nil_literal = "nil";
+bool_literal = "true" | "false";
+real_literal = (DIGIT | ".") { DIGIT | "." };
+string_literal = """ { GRAPHICAL | WHITESPACE } """ | """ { GRAPHICAL | WHITESPACE } """;
+qualified_name = identifier | intrinsic;
+call_expression = qualified_name "(" expression_list ")";
+assignment_expression = identifier "=" expression;
+unary_expression = unary_operator expression;
+binary_expression = expression binary_operator expression;
+
+identifier = ALPHABETICAL { ALPHANUMERIC | "_" };
+intrinsic = "$" { ALPHANUMERIC | "_" };
+unary_operator = "-" | "!";
+binary_operator =  "+" | "-" | "*" | "/" | "%" | "<" | ">" | "==" | "!=" | "<=" | ">=" | "||" | "&&";
+
+type = type_name | function_type;
+type_name = "Nil" | "Bool" | "Real" | "String";
+type_list = { type "," } type [","];
+function_type = "(" [type_list] ")" "->" type;
