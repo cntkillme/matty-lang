@@ -1,0 +1,25 @@
+{
+    "name": "mtl",
+    "displayName": "MattyLang",
+    "description": "Matty Programming Language",
+    "version": "1.0.0",
+    "engines": {
+        "vscode": "^1.0.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "mtl",
+            "aliases": ["MattyLang", "mtl"],
+            "extensions": ["mtl"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "mtl",
+            "scopeName": "source.mtl",
+            "path": "./syntaxes/mtl.tmLanguage.json"
+        }]
+    }
+}

@@ -1,0 +1,26 @@
+# v0.0.1.mtl - do not edit
+def _nil = nil
+def _true = true
+def _false = false
+def zero = 0
+def half = .5
+def one = 1.
+def pi = 3.14
+def str1 = ' hello	"123"!'
+def str2 = " hello	'123'!"
+def n = (pi + 1 - 1 * -2 / -2) % 1 # 0.14159...
+def b1 = !(!_true || _false) # true
+def b2 = n != 0 && !(n == 0) && n > 0 && n < 1 && n >= 0.14 && n <= 0.15 # true
+
+{
+	def x = 0
+	{
+		def y = 1
+		{
+			def x = x + y # 1
+			x = x + 1 # 2 (parent value: 0)
+			y = y + x # 3
+		}
+	}
+	x = x + 0 # 0
+}

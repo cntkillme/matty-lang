@@ -1,0 +1,35 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "MattyLang",
+	"scopeName": "source.mtl",
+	"fileTypes": [
+		"mtl"
+	],
+	"patterns": [
+		{
+			"name": "comment.line.mtl",
+			"begin": "#",
+			"end": "\n"
+		},
+		{
+			"name": "constant.language.mtl",
+			"match": "\\b(nil|true|false)\\b"
+		},
+		{
+			"name": "storage.type.mtl",
+			"match": "\\b(Nil|Bool|Real|String)\\b"
+		},
+		{
+			"name": "keyword.control.mtl",
+			"match": "\\b(def|if|else|while|break|continue|pass|return)\\b"
+		},
+		{
+			"name": "string.quoted.mtl",
+			"match": "([\"']).*?\\1"
+		},
+		{
+			"name": "constant.numeric.mtl",
+			"match": "\\b[\\d\\.]+\\b"
+		}
+	]
+}

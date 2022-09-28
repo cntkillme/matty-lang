@@ -1,0 +1,55 @@
+program = chunk EOF; (* v0.0.1 *)
+
+(* abstract *)
+statement = "{" chunk "}" | variable_definition | variable_assignment; (* v0.0.1 *)
+statement = if_statement | while_statement | break_statement | continue_statement; (* v0.0.2 *)
+statement = function_definition | return_statement | call_statement; (* v0.0.3 *)
+
+(* v0.0.1 *)
+chunk = { statement };
+variable_definition = "def" identifier "=" expression;
+variable_assignment = identifier "=" expression;
+
+(* v0.0.2 *)
+if_statement = "if" "(" expression ")" statement ["else" statement];
+while_statement = "while" "(" expression ")" statement;
+break_statement = "break";
+continue_statement = "continue";
+
+(* v0.0.3 *)
+function_definition = "def" identifier "(" [identifier ":" type { "," identifier ":" type } [","]] ")" block;
+return_statement = "return" [expression];
+call_statement = call_expression;
+
+(* abstract *)
+expression = "(" expression ")"; (* v0.0.1 *)
+expression = primary_expression | unary_expression | binary_expression; (* v0.0.1; v0.0.3 *)
+
+(* v0.0.1 *)
+unary_expression = ("-" | "!") expression;
+binary_expression = expression ("+" | "-" | "*" | "/" | "%" | "<" | ">" | "==" | "!=" | "<=" | ">=" | "||" | "&&") expression;
+
+(* abstract *)
+primary_expression = nil_literal | bool_literal | real_literal | string_literal | identifier; (* v0.0.1 *)
+primary_expression = call_expression; (* v0.0.3 *)
+
+(* v0.0.1 *)
+nil_literal = "nil";
+bool_literal = "true" | "false";
+int_literal = DIGIT { DIGIT };
+real_literal = int_literal "." { DIGIT } | "." int_literal;
+string_literal = "'" { GRAPHICAL | " " | "\t" } "'" | '"' { GRAPHICAL | " " | "\t" } '"';
+identifier = { ALPHABETICAL | "$" | "_" } { ALPHANUMERIC | "$" | "_" };
+
+(* v0.0.3 *)
+call_expression = identifier "(" [expression { "," expression } [","]] ")";
+
+(* abstract *)
+type = primitive_type;  (* v0.0.1 *)
+type = function_type; (* v0.0.3 *)
+
+(* v0.0.1 *)
+primitive_type = "Nil" | "Bool" | "Int" | "Real" | "String";
+
+(* v0.0.3 *)
+function_type = "(" [{ type "," } type [","]] ")" "->" type;
