@@ -27,7 +27,7 @@ expression = primary_expression | unary_expression | binary_expression; (* v0.0.
 
 (* v0.0.1 *)
 unary_expression = ("-" | "!") expression;
-binary_expression = expression ("+" | "-" | "*" | "/" | "%" | "<" | ">" | "==" | "!=" | "<=" | ">=" | "||" | "&&") expression;
+binary_expression = expression ("+" | "-" | "*" | "/" | "%" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "||" | "&&") expression;
 
 (* abstract *)
 primary_expression = nil_literal | bool_literal | real_literal | string_literal | identifier; (* v0.0.1 *)
@@ -36,8 +36,7 @@ primary_expression = call_expression; (* v0.0.3 *)
 (* v0.0.1 *)
 nil_literal = "nil";
 bool_literal = "true" | "false";
-int_literal = DIGIT { DIGIT };
-real_literal = int_literal "." { DIGIT } | "." int_literal;
+real_literal = DIGIT { DIGIT } "." { DIGIT } | "." DIGIT { DIGIT };
 string_literal = "'" { GRAPHICAL | " " | "\t" } "'" | '"' { GRAPHICAL | " " | "\t" } '"';
 identifier = { ALPHABETICAL | "$" | "_" } { ALPHANUMERIC | "$" | "_" };
 
@@ -49,7 +48,7 @@ type = primitive_type;  (* v0.0.1 *)
 type = function_type; (* v0.0.3 *)
 
 (* v0.0.1 *)
-primitive_type = "Nil" | "Bool" | "Int" | "Real" | "String";
+primitive_type = "Nil" | "Bool" | "Real" | "String";
 
 (* v0.0.3 *)
 function_type = "(" [{ type "," } type [","]] ")" "->" type;

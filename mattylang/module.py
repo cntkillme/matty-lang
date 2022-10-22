@@ -1,17 +1,16 @@
 from mattylang.diagnostics import Diagnostics
+from mattylang.globals import globals
+from mattylang.symbols import Scope
 
 
 class Module:
-    def __init__(self, file: str, source: str, verbose: bool = False) -> None:
-        self.__file = file
-        self.__source = source
-        self.__diagnostics = Diagnostics(verbose)
+    def __init__(self, file: str, source: str, verbose: bool = False, globals: Scope = globals) -> None:
+        self.file = file
+        self.source = source
+        self.diagnostics = Diagnostics(verbose)
+        self.globals = globals
 
-    def get_file(self) -> str:
-        return self.__file
-
-    def get_source(self) -> str:
-        return self.__source
-
-    def get_diagnostics(self) -> Diagnostics:
-        return self.__diagnostics
+    def print_diagnostics(self) -> None:
+        self.diagnostics.sort()
+        for diagnostic in self.diagnostics:
+            diagnostic.print(self.file)

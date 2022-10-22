@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 import argparse
-import sys
+from typing import List
 
 from mattylang.module import Module
-from mattylang.lexer import Lexer
-from mattylang.iterator import *
+from mattylang.lexer import Lexer, Token
+from mattylang.parser import Parser
+from mattylang.visitors.binder import Binder
+from mattylang.visitors.checker import Checker
+from mattylang.visitors.printer import Printer, SymbolPrinter
 
 
 def main() -> None:
@@ -13,8 +16,9 @@ def main() -> None:
     parser.add_argument('-V', '--version', action='version', version='%(prog)s 0.0.1')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
     parser.add_argument('--tokens', action='store_true', help='print the tokens')
-    parser.add_argument('--tree', choices=['undecorated', 'decorated'], help='print the syntax tree')
+    parser.add_argument('--syntax', action='store_true', help='print the syntax tree')
     parser.add_argument('--symbols', action='store_true', help='print the symbol table')
+    parser.add_argument('--globals', action='store_true', help='print the global table')
     parsed = parser.parse_args()
 
     if parsed.file:
@@ -32,34 +36,44 @@ def main() -> None:
             break
 
 
+def get_tokens(file: str, source: str):
+    module = Module(file, source)
+    lexer = Lexer(module)
+    tokens: List[Token] = []
+    token = lexer.token
+    while token.kind != 'eof':
+        tokens.append(token)
+        token = lexer.scan()
+    return tokens
+
+
 def run(args: argparse.Namespace, file: str, source: str) -> None:
     module = Module(file, source, verbose=args.verbose)
 
     if args.tokens:
-        lexer = Lexer(module)
-        tokens = list(TokenIterator(lexer))
-        print(' '.join(map(str, tokens)))
+        tokens = get_tokens(file, source)
+        print('\n'.join(map(str, tokens)))
 
-    # TODO: parse
+    lexer = Lexer(module)
+    parser = Parser(lexer)
+    program = parser.program
+    program.accept(Binder(module))
+    program.accept(Checker(module))
 
-    if args.tree == 'undecorated':
-        raise NotImplementedError()
-
-    # TODO: bind and type-check
-
-    if args.tree == 'decorated':
-        raise NotImplementedError()
+    if args.syntax:
+        program.accept(Printer(module))
 
     if args.symbols:
-        raise NotImplementedError()
+        program.accept(SymbolPrinter(module))
+
+    if args.globals:
+        print('{')
+        for symbol in module.globals.symbols.values():
+            print('  ' + str(symbol))
+        print('}')
 
     # show diagnostics
-    print_diagnostics(module)
-
-
-def print_diagnostics(module: Module):
-    for diagnostic in module.get_diagnostics():
-        diagnostic.print(module.get_file())
+    module.print_diagnostics()
 
 
 if __name__ == '__main__':

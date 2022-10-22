@@ -45,6 +45,9 @@ class Diagnostics:
     def emit_error(self, message: str, line: int, column: int) -> None:
         self.__emit_diagnostic(Diagnostic('error', message, line, column))
 
+    def sort(self):
+        self.__diagnostics.sort(key=lambda diagnostic: (diagnostic.line, diagnostic.column))
+
     def __emit_diagnostic(self, diagnostic: Diagnostic) -> None:
         self.__diagnostics.append(diagnostic)
         if diagnostic.kind == 'error' or diagnostic.kind == 'fatal':

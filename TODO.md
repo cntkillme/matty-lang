@@ -1,10 +1,11 @@
-# MattyLang Roadmap
+# MattyLang Road Map
 Subject to change.
 
 - [ ] **v0.0.1**
-	- [ ] Block-Scoped Variables
-	- [ ] Primitive Types and Literals (Nil, Bool, Int, Real, String)
-	- [ ] Expressions and Statements
+	- [x] Block-Scoped Variables
+	- [x] Primitive Types and Literals (Nil, Bool, Real, String)
+	- [x] Expressions and Statements
+	- [ ] Interpreter
 - [ ] **v0.0.2**
 	- [ ] If Statement
 	- [ ] While Statement
@@ -16,3 +17,4 @@ Subject to change.
 - [ ] **v1.0.0**
 	- [ ] Code Improvements
 	- [ ] Documentation	Improvements
+	- [ ] Tests

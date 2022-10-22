@@ -1,5 +1,5 @@
 from string import ascii_letters, digits, punctuation, whitespace
-from typing import Callable, Tuple
+from typing import Callable
 
 from mattylang.module import Module
 
@@ -15,8 +15,6 @@ class Token:
     def __str__(self) -> str:
         if self.kind == 'identifier':
             return f'identifier({self.lexeme})'
-        elif self.kind == 'int_literal':
-            return f'int_literal({self.lexeme})'
         elif self.kind == 'real_literal':
             return f'real_literal({self.lexeme})'
         elif self.kind == 'string_literal':
@@ -27,29 +25,18 @@ class Token:
 
 class Lexer:
     def __init__(self, module: Module):
-        self.__module = module
-        self.__source = module.get_source()
-        self.__position = 0
-        self.__line = 1
-        self.__column = 1
-        self.__token = Token('eof', '', self.__position, self.__line, self.__column)
+        self.module = module
+        self.source = module.source
+        self.position = 0
+        self.line = 1
+        self.column = 1
+        self.token = Token('eof', '', self.position, self.line, self.column)
+        self.scan()
 
-    def get_module(self) -> Module:
-        return self.__module
-
-    def get_position(self) -> int:
-        return self.__position
-
-    def get_location(self) -> Tuple[int, int]:
-        return self.__line, self.__column
-
-    def get_token(self) -> Token:
-        return self.__token
-
-    def scan(self) -> Token:
-        self.__token = self.__scan_impl()
-        self.__module.get_diagnostics().emit_info(f'scanned {self.__token}', self.__token.line, self.__token.column)
-        return self.__token
+    def scan(self):
+        self.token = self.__scan_impl()
+        self.module.diagnostics.emit_info(f'scanned {self.token}', self.token.line, self.token.column)
+        return self.token
 
     __space_set = set(whitespace)
     __digit_set = set(digits)
@@ -61,8 +48,8 @@ class Lexer:
 
     def __scan_impl(self) -> Token:
         chr = self.__get_char()
-        diagnostics = self.__module.get_diagnostics()
-        position, line, column = self.__position, self.__line, self.__column
+        diagnostics = self.module.diagnostics
+        position, line, column = self.position, self.line, self.column
 
         if chr == '':  # eof
             return Token('eof', '', position, line, column)
@@ -79,30 +66,29 @@ class Lexer:
             lexeme = self.__collect_lexeme(lambda chr: chr in self.__id_init_set or chr in self.__digit_set)
             kind = lexeme if lexeme in self.__keyword_set else 'identifier'
             return Token(kind, lexeme, position, line, column)
-        elif chr in self.__digit_set or chr == '.':  # int/real literal
+        elif chr in self.__digit_set or chr == '.':  # real literal
             lexeme = self.__collect_lexeme(lambda chr: chr in self.__digit_set)
-            kind = 'real_literal' if self.__get_char() == '.' else 'int_literal'
+            kind = 'real_literal'
 
-            if kind == 'real_literal':
+            if self.__get_char() == '.':
                 self.__next_char()
                 lexeme = lexeme + '.' + self.__collect_lexeme(lambda chr: chr in self.__digit_set)
 
             if lexeme == '.':
-                diagnostics.emit_error(f"expected digit near '.'", line, column)
-                lexeme = '0.0'
+                diagnostics.emit_error(f'expected digit near .', line, column)
+                lexeme = '0'
 
-            chr = self.__get_char()
-            if chr in self.__id_init_set or chr == '.':
-                diagnostics.emit_warning(f'expected whitespace after numeric literal {lexeme}', *self.get_location())
+            if self.__get_char() in self.__id_init_set or self.__get_char() == '.':
+                diagnostics.emit_warning(f'expected whitespace after real literal {lexeme}', self.line, self.column)
 
-            return Token(kind, lexeme, position, line, column)
+            return Token('real_literal', lexeme, position, line, column)
         elif chr == '"' or chr == "'":  # string literal
             quote = chr
             self.__next_char()
             text = self.__collect_lexeme(lambda chr: chr != quote and chr in self.__string_char_set)
             if self.__get_char() != quote:
-                quote_str = "double quote" if quote == '"' else "single quote"
-                diagnostics.emit_error(f'expected {quote_str} to terminate string', *self.get_location())
+                quote_str = 'double quote' if quote == '"' else 'single quote'
+                diagnostics.emit_error(f'expected {quote_str} to terminate string', self.line, self.column)
             else:
                 self.__next_char()
             return Token('string_literal', text, position, line, column)
@@ -121,27 +107,27 @@ class Lexer:
                 return self.__scan_impl()
 
     def __get_char(self):
-        return self.__source[self.__position] if self.__position < len(self.__source) else ''
+        return self.source[self.position] if self.position < len(self.source) else ''
 
     def __next_char(self):
-        if self.__position < len(self.__source):
+        if self.position < len(self.source):
             chr = self.__get_char()
-            self.__position += 1
+            self.position += 1
 
             if chr == '\n':
-                self.__line += 1
-                self.__column = 1
+                self.line += 1
+                self.column = 1
             else:
-                self.__column += 1
+                self.column += 1
 
         return self.__get_char()
 
     def __next_char_while(self, predicate: Callable[[str], bool]):
-        while self.__position < len(self.__source) and predicate(self.__get_char()):
+        while self.position < len(self.source) and predicate(self.__get_char()):
             self.__next_char()
         return chr
 
     def __collect_lexeme(self, predicate: Callable[[str], bool]):
-        start = self.__position
+        start = self.position
         self.__next_char_while(predicate)
-        return self.__source[start:self.__position]
+        return self.source[start:self.position]

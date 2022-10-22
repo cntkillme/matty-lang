@@ -1,9 +1,0 @@
---- @alias TokenKind EofTokenKind | CompilerTestTokenKind | LiteralTokenKind | NameTokenKind | TypeNameTokenKind | KeywordTokenKind | PunctuationTokenKind
---- @alias TokenValue nil | boolean | number | string
---- @alias EofTokenKind "eof"
---- @alias CompilerTestTokenKind "#@"
---- @alias LiteralTokenKind "nil" | "true" | "false" | "<real>" | "<string>"
---- @alias NameTokenKind "<identifier>" | "<intrinsic>"
---- @alias TypeNameTokenKind "Nil" | "Bool" | "Real" | "String"
---- @alias KeywordTokenKind "def" | "if" | "elseif" | "else" | "while" | "break" | "continue" | "pass" | "return"
---- @alias PunctuationTokenKind "(" | ")" | "{" | "}" | "," | ":" | "->" | "=" | "!" | "+" | "-" | "*" | "/" | "%" | "<" | ">" | "==" | "!=" | "<=" | ">=" | "||" | "&&"
