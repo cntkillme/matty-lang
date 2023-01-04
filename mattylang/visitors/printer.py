@@ -17,7 +17,8 @@ class Printer(ScopedVisitor):
     def visit_chunk(self, node: ChunkNode):
         self.__header(node)
         self.__indent += 1
-        self.__write('scope: ' + str(node.scope) if node.scope is not None else '\u001b[41m<no scope>\u001b[0m')
+        self.__write('scope: ' + str(node.symbol_table)
+                     if node.symbol_table is not None else '\u001b[41m<no scope>\u001b[0m')
         super().visit_chunk(node)  # visit children
         self.__indent -= 1
 
@@ -60,9 +61,8 @@ class Printer(ScopedVisitor):
     def visit_identifier(self, node: IdentifierNode):
         self.__header(node)
         self.__indent += 1
-        self.__write('token : ' + str(node.token) if node.token is not None else '\u001b[41m<no token>\u001b[0m')
-        self.__write('symbol: ' + str(node.symbol) if node.symbol is not None else '\u001b[41m<no symbol>\u001b[0m')
-        self.__write('type  : ' + str(node.type) if node.type is not None else '\u001b[41m<no type>\u001b[0m')
+        self.__write('symbol: ' + (str(node.symbol) if node.symbol is not None else '\u001b[41m<no symbol>\u001b[0m'))
+        self.__write('type  : ' + (str(node.type) if node.type is not None else '\u001b[41m<no type>\u001b[0m'))
         self.__indent -= 1
 
     def __write(self, text: str):
@@ -72,7 +72,7 @@ class Printer(ScopedVisitor):
         if node.invalid:
             self.__write(f'\u001b[41m{node}\u001b[0m')
         else:
-            self.__write(str(node))
+            self.__write(f'{node}')
 
 
 class SymbolPrinter(ScopedVisitor):
@@ -87,8 +87,8 @@ class SymbolPrinter(ScopedVisitor):
         self.__write('{')
         self.__indent += 1
 
-        if node.scope is not None:
-            for symbol in node.scope.symbols.values():
+        if node.symbol_table is not None:
+            for symbol in node.symbol_table.symbols.values():
                 self.__write(str(symbol))
 
         super().visit_chunk(node)  # visit children

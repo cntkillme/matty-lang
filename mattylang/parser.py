@@ -20,8 +20,8 @@ class Parser:
             return token.lexeme
         else:
             # diagnostic: expected token
-            self.module.diagnostics.emit_error(
-                f'expected {kind} (got {token}) {reason}', token.line, token.column)
+            self.module.diagnostics.emit_diagnostic(
+                'error', f'syntax: expected {kind} (got {token}) {reason}', token.position)
             return None
 
     def __parse_program(self) -> ProgramNode:
@@ -34,7 +34,8 @@ class Parser:
         while kind != 'eof' and kind != terminate:
             statement = self.__parse_statement()
             if statement is not None:
-                chunk.add_statement(statement)
+                statement.parent = chunk
+                chunk.statements.append(statement)
             kind = self.lexer.token.kind
         return chunk
 
@@ -53,61 +54,69 @@ class Parser:
 
             # diagnostic: expected identifier to name variable
             if name is None:
-                self.module.diagnostics.emit_error(
-                    f'expected identifier (got {token}) to name variable', token.line, token.column)
                 return None  # recovery: skip entire statement
 
             # diagnostic: expected expression to initialize variable
             if self.__expect('=', f'to initialize variable {name}') is None:
-                initializer = NilLiteralNode().add_token(self.lexer.token)
+                initializer = NilLiteralNode()
+                initializer.position = self.lexer.token.position
                 initializer.invalid = True
             else:
-                initializer_token = self.lexer.token
+                token = self.lexer.token
                 initializer = self.__parse_expression()
 
                 # diagnostic: expected expression to initialize variable
                 if initializer is None:
-                    initializer = NilLiteralNode().add_token(initializer_token)
+                    initializer = NilLiteralNode()
+                    initializer.position = token.position
                     initializer.invalid = True
-                    self.module.diagnostics.emit_error(
-                        f'expected expression (got {initializer_token}) to initialize variable {name}', initializer_token.line, initializer_token.column)
+                    self.module.diagnostics.emit_diagnostic(
+                        'error', f'syntax: expected expression (got {token}) to initialize variable {name}', token.position)
 
-            identifier = IdentifierNode(name).add_token(name_token)
-            initializer = initializer or NilLiteralNode().add_token(self.lexer.token)
-            node = VariableDefinitionNode(identifier, initializer).add_token(def_token)
+            identifier = IdentifierNode(name)
+            identifier.position = name_token.position
+            initializer = initializer or NilLiteralNode()
+            node = VariableDefinitionNode(identifier, initializer)
+            node.position = def_token.position
             node.invalid = identifier.invalid or initializer.invalid
             return node
         elif token.kind == 'identifier':  # variable assignment
-            first_token = token
             name = token.lexeme
             self.lexer.scan()
 
-            # diagnostic: expected = to assign variable
-            if self.__expect('=', f'to assign variable {name}') is None:
-                return None
+            # diagnostic: unexpected expression
+            if self.lexer.token.kind != '=':
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: unexpected identifier {name}', token.position)
+                return None  # recovery: skip expression
 
-            identifier = IdentifierNode(name).add_token(first_token)
+            self.lexer.scan()
+            identifier = IdentifierNode(name)
+            identifier.position = token.position
             initializer = self.__parse_expression()
 
             # diagnostic: expected expression to assign variable
             if initializer is None:
                 token = self.lexer.token
-                self.module.diagnostics.emit_error(
-                    f'expected expression (got {token}) to assign to variable {name}', token.line, token.column)
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: expected expression (got {token}) to assign to variable {name}', token.position)
                 return None  # recovery: skip statement
 
-            return VariableAssignmentNode(identifier, initializer).add_token(first_token)
+            node = VariableAssignmentNode(identifier, initializer)
+            node.position = token.position
+            return node
         else:
             expression = self.__parse_expression()
 
-            # diagnostic: unused expression
+            # diagnostic: unexpected expression
             if expression is not None:
-                self.module.diagnostics.emit_error(f'unused expression {expression}', *expression.get_location())
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: unexpected {expression}', expression.position)
                 return None  # recovery: skip expression
 
-            # diagnostic: statement expected
-            self.module.diagnostics.emit_error(
-                f'expected statement (got {token})', token.line, token.column)
+            # diagnostic: expected statement
+            self.module.diagnostics.emit_diagnostic(
+                'error', f'syntax: expected statement (got {token})', token.position)
             self.lexer.scan()  # warning: parse_statement will advance the lexer even if no statement was parsed
             return None  # recovery: skip token
 
@@ -123,29 +132,29 @@ class Parser:
 
     def __parse_binary_expression(self, precedence: int) -> ExpressionNode | None:
         left = self.__parse_unary_expression()
-        operator = self.lexer.token.kind
+        operator = self.lexer.token
 
         # Keep parsing expressions at or greater precedence of the current operator.
         # Example: `1 + 2 - 3` will be parsed as `(1 + 2) - 3`
-        while left is not None and self.__binary_operators.get(operator, -1) >= precedence:
+        while left is not None and self.__binary_operators.get(operator.kind, -1) >= precedence:
             token = self.lexer.token
             next_token = self.lexer.scan()  # skip operator
 
             # Parse sub-expressions of right operand with higher precedence than the current operator.
             # Example: `1 + 2 * 3` will be parsed as `1 + (2 * 3)`
-            right = self.__parse_binary_expression(self.__binary_operators[operator] + 1)
+            right = self.__parse_binary_expression(self.__binary_operators[operator.kind] + 1)
 
             # diagnostic: expected expression after binary operator
             if not right:
-                self.module.diagnostics.emit_error(
-                    f'expected expression after {token} (got {next_token})', next_token.line, next_token.column)
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: expected expression after {token} (got {next_token})', next_token.position)
                 return left  # recovery: yield the left operand
 
             # Create binary expression node, and assign it as the left operand for the next iteration.
-            left = BinaryExpressionNode(operator, left, right)
-            if left.left.token is not None:
-                left.add_token(left.left.token)
-            operator = self.lexer.token.kind
+            position = left.position
+            left = BinaryExpressionNode(operator.kind, left, right)
+            left.position = position
+            operator = self.lexer.token
 
         return left
 
@@ -155,20 +164,21 @@ class Parser:
     }
 
     def __parse_unary_expression(self) -> ExpressionNode | None:
-        token = self.lexer.token
+        operator = self.lexer.token
 
-        if token.kind in self.__unary_operators:
+        if operator.kind in self.__unary_operators:
             self.lexer.scan()  # skip operator
             operand = self.__parse_unary_expression()
             next_token = self.lexer.token
 
             # diagnostic: expected expression after unary operator
             if operand is None:
-                self.module.diagnostics.emit_error(
-                    f'expected expression after {token} (got {next_token})', next_token.line, next_token.column)
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: expected expression after {operator} (got {next_token})', next_token.position)
                 return None  # recovery: skip entire expression
 
-            expr = UnaryExpressionNode(token.kind, operand).add_token(token)
+            expr = UnaryExpressionNode(operator.kind, operand)
+            expr.position = operator.position
             return expr
         else:
             return self.__parse_primary_expression()
@@ -179,28 +189,30 @@ class Parser:
         if token.kind == '(':
             self.lexer.scan()
             expression = self.__parse_expression()
+            # diagnostic: expected ')'
             self.__expect(')', 'to close expression')
             return expression   # recovery: implicitly close unclosed expressions.
         elif token.kind == 'nil':
             self.lexer.scan()
-            return NilLiteralNode().add_token(token)
+            node = NilLiteralNode()
         elif token.kind == 'true':
             self.lexer.scan()
-            return BoolLiteralNode(True).add_token(token)
+            node = BoolLiteralNode(True)
         elif token.kind == 'false':
             self.lexer.scan()
-            return BoolLiteralNode(False).add_token(token)
+            node = BoolLiteralNode(False)
         elif token.kind == 'real_literal':
             # precondition: token.lexeme is a valid float literal (lexer invariant)
-            value = float(token.lexeme)
             self.lexer.scan()
-            return RealLiteralNode(value).add_token(token)
+            node = RealLiteralNode(float(token.lexeme))
         elif token.kind == 'string_literal':
-            value = token.lexeme
             self.lexer.scan()
-            return StringLiteralNode(value).add_token(token)
+            node = StringLiteralNode(token.lexeme)
         elif token.kind == 'identifier':
             self.lexer.scan()
-            return IdentifierNode(token.lexeme).add_token(token)
+            node = IdentifierNode(token.lexeme)
         else:
             return None
+
+        node.position = token.position
+        return node

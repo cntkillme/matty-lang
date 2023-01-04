@@ -11,24 +11,25 @@ if TYPE_CHECKING:
 
 class ExpressionNode(AbstractNode, ABC):
     @abstractmethod
-    def __init__(self, kind: str):
-        super().__init__(kind)
+    def __init__(self):
+        super().__init__()
         self.type: Optional['TypeNode'] = None
+
+    def get_type(self) -> 'TypeNode':
+        assert self.type is not None, 'fatal: type not set'
+        return self.type
 
 
 class PrimaryExpressionNode(ExpressionNode, ABC):
     @abstractmethod
-    def __init__(self, kind: str):
-        super().__init__(kind)
+    def __init__(self):
+        super().__init__()
         self.value = None
-
-    def __str__(self):
-        return f'{self.kind}({str(self.value)})'
 
 
 class UnaryExpressionNode(ExpressionNode):
     def __init__(self, operator: str, operand: ExpressionNode):
-        super().__init__('unary_expression')
+        super().__init__()
         self.operator = operator
         operand.parent = self
         self.operand = operand
@@ -43,7 +44,7 @@ class UnaryExpressionNode(ExpressionNode):
 
 class BinaryExpressionNode(ExpressionNode):
     def __init__(self, operator: str, left: ExpressionNode, right: ExpressionNode):
-        super().__init__('binary_expression')
+        super().__init__()
         self.operator = operator
         left.parent = self
         self.left = left
@@ -60,11 +61,11 @@ class BinaryExpressionNode(ExpressionNode):
 
 class NilLiteralNode(PrimaryExpressionNode):
     def __init__(self):
-        super().__init__('nil_literal')
+        super().__init__()
         self.value = None
 
     def __str__(self):
-        return f'nil_literal'
+        return 'nil_literal'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_nil_literal(self)
@@ -72,11 +73,11 @@ class NilLiteralNode(PrimaryExpressionNode):
 
 class BoolLiteralNode(PrimaryExpressionNode):
     def __init__(self, value: bool):
-        super().__init__('bool_literal')
+        super().__init__()
         self.value = value
 
     def __str__(self):
-        return f'{self.kind}({"true" if self.value else "false"})'
+        return f'bool_literal({str(self.value).lower()})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_bool_literal(self)
@@ -84,8 +85,11 @@ class BoolLiteralNode(PrimaryExpressionNode):
 
 class RealLiteralNode(PrimaryExpressionNode):
     def __init__(self, value: float):
-        super().__init__('real_literal')
+        super().__init__()
         self.value = value
+
+    def __str__(self):
+        return f'real_literal({self.value})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_real_literal(self)
@@ -93,11 +97,11 @@ class RealLiteralNode(PrimaryExpressionNode):
 
 class StringLiteralNode(PrimaryExpressionNode):
     def __init__(self, value: str):
-        super().__init__('string_literal')
+        super().__init__()
         self.value = value
 
     def __str__(self):
-        return f'{self.kind}({repr(self.value)})'
+        return f'string_literal({repr(self.value)})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_string_literal(self)
@@ -105,9 +109,12 @@ class StringLiteralNode(PrimaryExpressionNode):
 
 class IdentifierNode(PrimaryExpressionNode):
     def __init__(self, value: str):
-        super().__init__('identifier')
+        super().__init__()
         self.value = value
         self.symbol: Optional['Symbol'] = None
+
+    def __str__(self):
+        return f'identifier({self.value})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_identifier(self)

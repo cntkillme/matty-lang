@@ -1,4 +1,4 @@
-# v0.0.1.mtl - do not edit
+# v0.1.mtl - do not edit
 def _nil = nil
 def _true = true
 def _false = false
@@ -22,5 +22,6 @@ def b2 = n != 0.0 && !(n == 0.0) && n > 0.0 && n < 1.0 && n >= 0.14 && n <= 0.15
 			y = y + x # 3
 		}
 	}
+	def y = 2
 	x = x + 0 # 0
 }

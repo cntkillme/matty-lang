@@ -1,6 +1,10 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
 from mattylang.module import Module
-from mattylang.nodes import *
+
+if TYPE_CHECKING:
+    from mattylang.nodes import *
 
 
 class AbstractVisitor(ABC):
@@ -59,11 +63,12 @@ class ScopedVisitor(AbstractVisitor, ABC):
         self._scope = module.globals
 
     def visit_program(self, node: 'ProgramNode'):
-        assert node.chunk.scope and node.chunk.scope.parent == self._globals, 'fatal: global scope mismatch'
+        assert node.chunk.symbol_table and node.chunk.symbol_table.parent == self._globals, 'fatal: global scope mismatch'
         super().visit_program(node)
 
     def visit_chunk(self, node: 'ChunkNode'):
-        assert node.scope and node.scope.parent == self._scope, 'fatal: scope parent mismatch'
-        self._scope = node.scope
+        assert node.symbol_table and node.symbol_table.parent == self._scope, 'fatal: scope parent mismatch'
+        scope = self._scope
+        self._scope = node.get_symbol_table()
         super().visit_chunk(node)
-        self._scope = self._scope.parent
+        self._scope = scope

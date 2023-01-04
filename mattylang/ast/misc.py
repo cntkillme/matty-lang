@@ -9,12 +9,12 @@ if TYPE_CHECKING:
 
 class ProgramNode(AbstractNode):
     def __init__(self, chunk: 'ChunkNode'):
-        super().__init__('program')
+        super().__init__()
         self.chunk = chunk
         self.invalid = chunk.invalid
 
     def __str__(self):
-        return 'program'
+        return f'program'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_program(self)

@@ -1,5 +1,4 @@
 import unittest
-from typing import List
 
 from mattylang.module import Module
 from mattylang.lexer import Lexer, Token
@@ -48,7 +47,7 @@ class TestV1(unittest.TestCase):
 
     def __get_tokens(self, module: Module):
         lexer = Lexer(module)
-        tokens: List[Token] = []
+        tokens: list[Token] = []
         while lexer.token.kind != 'eof':
             tokens.append(lexer.token)
             lexer.scan()

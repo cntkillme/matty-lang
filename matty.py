@@ -2,23 +2,25 @@
 import argparse
 from typing import List
 
-from mattylang.module import Module
 from mattylang.lexer import Lexer, Token
+from mattylang.module import Module
 from mattylang.parser import Parser
 from mattylang.visitors.binder import Binder
 from mattylang.visitors.checker import Checker
+from mattylang.visitors.emitter import Emitter
 from mattylang.visitors.printer import Printer, SymbolPrinter
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='MattyLang frontend, compiles and executes MattyLang files.')
     parser.add_argument('file', type=str, nargs='?', help='the input file (none for REPL)')
+    parser.add_argument('-o', '--output', type=str, help='the output file')
     parser.add_argument('-V', '--version', action='version', version='%(prog)s 0.0.1')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
     parser.add_argument('--tokens', action='store_true', help='print the tokens')
     parser.add_argument('--syntax', action='store_true', help='print the syntax tree')
     parser.add_argument('--symbols', action='store_true', help='print the symbol table')
-    parser.add_argument('--globals', action='store_true', help='print the global table')
+    parser.add_argument('--code', action='store_true', help='print the generated code')
     parsed = parser.parse_args()
 
     if parsed.file:
@@ -47,12 +49,14 @@ def get_tokens(file: str, source: str):
     return tokens
 
 
-def run(args: argparse.Namespace, file: str, source: str) -> None:
+def run(args: argparse.Namespace, file: str, source: str):
     module = Module(file, source, verbose=args.verbose)
 
     if args.tokens:
         tokens = get_tokens(file, source)
-        print('\n'.join(map(str, tokens)))
+        for token in tokens:
+            line, column = module.line_map.get_location(token.position)
+            print(f'{file}:{line}:{column}: {token}')
 
     lexer = Lexer(module)
     parser = Parser(lexer)
@@ -66,14 +70,22 @@ def run(args: argparse.Namespace, file: str, source: str) -> None:
     if args.symbols:
         program.accept(SymbolPrinter(module))
 
-    if args.globals:
-        print('{')
-        for symbol in module.globals.symbols.values():
-            print('  ' + str(symbol))
-        print('}')
-
-    # show diagnostics
     module.print_diagnostics()
+
+    if module.diagnostics.has_error():
+        return 1
+
+    emitter = Emitter(module)
+    program.accept(emitter)
+
+    if args.code:
+        print(str(emitter))
+
+    if args.output:
+        with open(args.output, 'w') as fd:
+            fd.write(str(emitter))
+
+    return 0
 
 
 if __name__ == '__main__':

@@ -1,26 +1,25 @@
-import sys
-from typing import Iterator, List, Optional
+from typing import List, Literal
+
+
+DiagnosticKind = Literal['info', 'warning', 'error']
 
 
 class Diagnostic:
-    def __init__(self, kind: str, message: str, line: int, column: int) -> None:
+    def __init__(self, kind: DiagnosticKind, message: str, position: int):
         self.kind = kind
         self.message = message
-        self.line = line
-        self.column = column
+        self.position = position
 
     def __str__(self):
-        color = '\033[1;91m' if self.kind == 'error' else '\033[1;93m' if self.kind == 'warning' else '\033[1;94m'
-        return f'{color}{self.kind}\033[0m: {self.message}'
+        color = self.color_table.get(self.kind, '\033[1;94m')
+        color_reset = '\033[0m'
+        return f'{color}{self.kind}{color_reset}: {self.message}'
 
-    def format(self, file: Optional[str]):
-        if file:
-            return f'{file}:{self.line}:{self.column}: {self}'
-        else:
-            return f'{self} at line {self.line}, column {self.column}'
-
-    def print(self, file: Optional[str]):
-        print(self.format(file), file=sys.stdout if self.kind == 'info' else sys.stderr)
+    color_table = {
+        'info': '\033[1;94m',  # general information, for verbose
+        'warning': '\033[1;93m',  # compiler warnings, such as unused variables
+        'error': '\033[1;91m',  # compiler errors, such as syntax errors or type errors
+    }
 
 
 class Diagnostics:
@@ -29,26 +28,20 @@ class Diagnostics:
         self.__has_error = False
         self.__verbose = verbose
 
-    def __iter__(self) -> Iterator[Diagnostic]:
+    def __iter__(self):
         return iter(self.__diagnostics)
 
-    def has_error(self) -> bool:
+    def has_error(self):
         return self.__has_error
 
-    def emit_info(self, message: str, line: int, column: int) -> None:
-        if self.__verbose:
-            self.__emit_diagnostic(Diagnostic('info', message, line, column))
+    def emit_diagnostic(self, kind: DiagnosticKind, message: str, position: int = 0):
+        diagnostic = Diagnostic(kind, message, position)
+        if diagnostic.kind == 'info' and not self.__verbose:
+            return
+        elif diagnostic.kind == 'error':
+            self.__has_error = True
 
-    def emit_warning(self, message: str, line: int, column: int) -> None:
-        self.__emit_diagnostic(Diagnostic('warning', message, line, column))
-
-    def emit_error(self, message: str, line: int, column: int) -> None:
-        self.__emit_diagnostic(Diagnostic('error', message, line, column))
+        self.__diagnostics.append(diagnostic)
 
     def sort(self):
-        self.__diagnostics.sort(key=lambda diagnostic: (diagnostic.line, diagnostic.column))
-
-    def __emit_diagnostic(self, diagnostic: Diagnostic) -> None:
-        self.__diagnostics.append(diagnostic)
-        if diagnostic.kind == 'error' or diagnostic.kind == 'fatal':
-            self.__has_error = True
+        self.__diagnostics.sort(key=lambda diagnostic: diagnostic.position)

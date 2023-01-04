@@ -9,10 +9,6 @@ if TYPE_CHECKING:
 
 class TypeNode(AbstractNode, ABC):
     @abstractmethod
-    def __init__(self, kind: str):
-        super().__init__(kind)
-
-    @abstractmethod
     def is_equivalent(self, other: 'TypeNode') -> bool:
         pass
 
@@ -24,16 +20,16 @@ class TypeNode(AbstractNode, ABC):
 
 
 class PrimitiveTypeNode(TypeNode, ABC):
-    def __str__(self) -> str:
-        return self.kind
-
-    def is_equivalent(self, other: 'TypeNode') -> bool:
-        return isinstance(other, PrimitiveTypeNode) and self.kind == other.kind
+    def is_equivalent(self, other: 'TypeNode'):
+        return isinstance(self, other.__class__)
 
 
 class NilTypeNode(PrimitiveTypeNode):
     def __init__(self):
-        super().__init__('Nil')
+        super().__init__()
+
+    def __str__(self) -> str:
+        return 'Nil'
 
     def accept(self, visitor: 'AbstractVisitor') -> None:
         raise NotImplementedError()  # v0.0.3
@@ -41,7 +37,10 @@ class NilTypeNode(PrimitiveTypeNode):
 
 class BoolTypeNode(PrimitiveTypeNode):
     def __init__(self):
-        super().__init__('Bool')
+        super().__init__()
+
+    def __str__(self) -> str:
+        return 'Bool'
 
     def accept(self, visitor: 'AbstractVisitor') -> None:
         raise NotImplementedError()  # v0.0.3
@@ -49,7 +48,10 @@ class BoolTypeNode(PrimitiveTypeNode):
 
 class RealTypeNode(PrimitiveTypeNode):
     def __init__(self):
-        super().__init__('Real')
+        super().__init__()
+
+    def __str__(self) -> str:
+        return 'Real'
 
     def accept(self, visitor: 'AbstractVisitor') -> None:
         raise NotImplementedError()  # v0.0.3
@@ -63,7 +65,10 @@ class RealTypeNode(PrimitiveTypeNode):
 
 class StringTypeNode(PrimitiveTypeNode):
     def __init__(self):
-        super().__init__('String')
+        super().__init__()
+
+    def __str__(self) -> str:
+        return 'String'
 
     def accept(self, visitor: 'AbstractVisitor') -> None:
         raise NotImplementedError()  # v0.0.3

@@ -1,77 +1,69 @@
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from abc import ABC
+from typing import TYPE_CHECKING, List, Optional
 
-from mattylang.ast.core import AbstractNode, NodeList
+from mattylang.ast.core import AbstractNode, Declaration
 
 if TYPE_CHECKING:
     from mattylang.ast.expression import ExpressionNode, IdentifierNode
-    from mattylang.symbols import Scope
+    from mattylang.ast.type import TypeNode
+    from mattylang.symbols import SymbolTable
     from mattylang.visitor import AbstractVisitor
 
 
 class StatementNode(AbstractNode, ABC):
-    @abstractmethod
-    def __init__(self, kind: str):
-        super().__init__(kind)
+    pass
 
 
 class ChunkNode(StatementNode):
     def __init__(self):
-        super().__init__('chunk')
-        self.statements = NodeList[StatementNode](self)
-        self.scope: Optional['Scope'] = None
+        super().__init__()
+        self.statements: List[StatementNode] = []
+        self.symbol_table: Optional[SymbolTable] = None
 
     def __str__(self):
         return f'chunk({len(self.statements)})'
 
-    def add_statement(self, statement: StatementNode):
-        self.statements.add_node(statement)
-        self.invalid = self.invalid or statement.invalid
-
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_chunk(self)
 
+    def get_symbol_table(self) -> 'SymbolTable':
+        assert self.symbol_table is not None, 'fatal: symbol table not set'
+        return self.symbol_table
 
-class VariableDefinitionNode(StatementNode):
+
+class VariableDefinitionNode(StatementNode, Declaration):
     def __init__(self, identifier: 'IdentifierNode', initializer: 'ExpressionNode'):
-        super().__init__('variable_definition')
+        super().__init__()
         identifier.parent = self
         initializer.parent = self
         self.identifier = identifier
-        self.__initializer = initializer
+        self.initializer = initializer
         self.invalid = identifier.invalid or initializer.invalid
-        self.constant = False
+
+    def __str__(self):
+        return f'variable_definition({self.identifier})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_variable_definition(self)
 
-    @property
-    def initializer(self):
-        return self.__initializer
+    def get_declared_name(self) -> str:
+        return self.identifier.value
 
-    @initializer.setter
-    def initializer(self, initializer: 'ExpressionNode'):
-        initializer.parent = self
-        self.__initializer = initializer
+    def get_declared_type(self) -> 'TypeNode':
+        return self.identifier.get_symbol().get_type()
 
 
 class VariableAssignmentNode(StatementNode):
-    def __init__(self, identifier: 'IdentifierNode', initializer: 'ExpressionNode'):
-        super().__init__('variable_assignment')
-        self.identifier = identifier
-        self.__operand = initializer
-        self.invalid = identifier.invalid or initializer.invalid
+    def __init__(self, identifier: 'IdentifierNode', value: 'ExpressionNode'):
+        super().__init__()
         identifier.parent = self
-        initializer.parent = self
+        self.identifier = identifier
+        value.parent = self
+        self.value = value
+        self.invalid = identifier.invalid or value.invalid
+
+    def __str__(self):
+        return f'variable_assignment({self.identifier})'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_variable_assignment(self)
-
-    @property
-    def value(self):
-        return self.__operand
-
-    @value.setter
-    def value(self, initializer: 'ExpressionNode'):
-        initializer.parent = self
-        self.__operand = initializer

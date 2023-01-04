@@ -1,20 +1,28 @@
 # MattyLang Road Map
-Subject to change.
 
-- [ ] **v0.0.1**
-	- [x] Block-Scoped Variables
-	- [x] Primitive Types and Literals (Nil, Bool, Real, String)
-	- [x] Expressions and Statements
-	- [ ] Interpreter
-- [ ] **v0.0.2**
-	- [ ] If Statement
-	- [ ] While Statement
-	- [ ] Break Statement
-	- [ ] Continue Statement
-- [ ] **v0.0.3**
-	- [ ] Functions and Return Statement
-	- [ ] Standard Library
-- [ ] **v1.0.0**
-	- [ ] Code Improvements
-	- [ ] Documentation	Improvements
-	- [ ] Tests
+- v0.1
+	- Chunks
+	- Block-scoped variables (Definition, Assignment)
+	- Primitives literals and types (Nil, Bool, Real, String)
+	- Unary and binary expressions (arithmetic, relational, logical).
+- v0.2
+	- Control flow statements (If, While, Break, Continue)
+- v0.3
+	- Functions and function types (Definition, Call, Return statements)
+	- Intrinsic functions (replaced once a standard library is introduced)
+- v1.0
+	- Code Improvements
+	- Documentation	Improvements
+	- Tests
+- Future Plans (subject to change)
+	- Closures and lexically-scoped variables, Lambdas
+	- Real literal expansion (scientific notation)
+	- String literal expansion (string escape sequences, string interpolation)
+	- Integer type and literals
+	- Arrays and subscript expression
+	- Module imports/exports
+	- Compound types and tuples
+	- Type aliasing
+	- Command-line arguments
+	- Standard library
+	- ...

@@ -1,0 +1,18 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip-ci]')"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      - run: pip install -r requirements.txt
+      - uses: weibullguy/python-lint-plus@master
+        with:
+          python-root-list: mattylang tests
+          extra-mypy-options: "--strict"
+      - run: python -m coverage run -m unittest discover tests
+      - uses: codecov/codecov-action@v3
