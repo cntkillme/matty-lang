@@ -8,7 +8,7 @@ def one = 1.
 def pi = 3.14
 def str1 = ' hello	"123"!'
 def str2 = " hello	'123'!"
-def n = (pi + 1.0 - 1.0 * -2.0 / -2.0) % 1.0 # 0.14159...
+def n = (pi + 1.0 - 1.0 * -2.0 / -2.0) % 1.0 # 0.14
 def b1 = !(!_true || _false) # true
 def b2 = n != 0.0 && !(n == 0.0) && n > 0.0 && n < 1.0 && n >= 0.14 && n <= 0.15 # true
 

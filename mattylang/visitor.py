@@ -22,14 +22,33 @@ class AbstractVisitor(ABC):
             node.invalid = node.invalid or statement.invalid
 
     def visit_variable_definition(self, node: 'VariableDefinitionNode'):
-        node.identifier.accept(self)
         node.initializer.accept(self)
+        node.identifier.accept(self)
         node.invalid = node.invalid or node.identifier.invalid or node.initializer.invalid
 
     def visit_variable_assignment(self, node: 'VariableAssignmentNode'):
         node.identifier.accept(self)
         node.value.accept(self)
         node.invalid = node.invalid or node.identifier.invalid or node.value.invalid
+
+    def visit_if_statement(self, node: 'IfStatementNode'):
+        node.condition.accept(self)
+        node.if_body.accept(self)
+        if node.else_body is not None:
+            node.else_body.accept(self)
+        node.invalid = node.invalid or node.condition.invalid or node.if_body.invalid or (
+            node.else_body is not None and node.else_body.invalid)
+
+    def visit_while_statement(self, node: 'WhileStatementNode'):
+        node.condition.accept(self)
+        node.body.accept(self)
+        node.invalid = node.invalid or node.condition.invalid or node.body.invalid
+
+    def visit_break_statement(self, node: 'BreakStatementNode'):
+        pass
+
+    def visit_continue_statement(self, node: 'ContinueStatementNode'):
+        pass
 
     def visit_unary_expression(self, node: 'UnaryExpressionNode'):
         node.operand.accept(self)
@@ -59,16 +78,16 @@ class AbstractVisitor(ABC):
 class ScopedVisitor(AbstractVisitor, ABC):
     def __init__(self, module: Module):
         self.module = module
-        self._globals = module.globals
-        self._scope = module.globals
+        self.globals = module.globals
+        self.scope = module.globals
 
     def visit_program(self, node: 'ProgramNode'):
-        assert node.chunk.symbol_table and node.chunk.symbol_table.parent == self._globals, 'fatal: global scope mismatch'
+        assert node.chunk.symbol_table and node.chunk.symbol_table.parent == self.globals, 'fatal: global scope mismatch'
         super().visit_program(node)
 
     def visit_chunk(self, node: 'ChunkNode'):
-        assert node.symbol_table and node.symbol_table.parent == self._scope, 'fatal: scope parent mismatch'
-        scope = self._scope
-        self._scope = node.get_symbol_table()
+        assert node.symbol_table and node.symbol_table.parent == self.scope, 'fatal: scope parent mismatch'
+        scope = self.scope
+        self.scope = node.get_symbol_table()
         super().visit_chunk(node)
-        self._scope = scope
+        self.scope = scope

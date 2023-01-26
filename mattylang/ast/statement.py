@@ -50,7 +50,10 @@ class VariableDefinitionNode(StatementNode, Declaration):
         return self.identifier.value
 
     def get_declared_type(self) -> 'TypeNode':
-        return self.identifier.get_symbol().get_type()
+        symbol = self.identifier.symbol
+        assert symbol is not None, 'fatal: symbol not set'
+        assert symbol.type is not None, 'fatal: symbol type not set'
+        return symbol.type
 
 
 class VariableAssignmentNode(StatementNode):
@@ -67,3 +70,62 @@ class VariableAssignmentNode(StatementNode):
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_variable_assignment(self)
+
+
+class IfStatementNode(StatementNode):
+    def __init__(self, condition: 'ExpressionNode', if_body: StatementNode, else_body: Optional[StatementNode] = None):
+        super().__init__()
+        condition.parent = self
+        self.condition = condition
+        if_body.parent = self
+        self.if_body = if_body
+        if else_body is not None:
+            else_body.parent = self
+        self.else_body = else_body
+        self.invalid = condition.invalid or if_body.invalid or (else_body is not None and else_body.invalid)
+
+    def __str__(self):
+        return f'if_statement'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_if_statement(self)
+
+
+class WhileStatementNode(StatementNode):
+    def __init__(self, condition: 'ExpressionNode', body: StatementNode):
+        super().__init__()
+        condition.parent = self
+        self.condition = condition
+        body.parent = self
+        self.body = body
+        self.invalid = condition.invalid or body.invalid
+
+    def __str__(self):
+        return f'while_statement'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_while_statement(self)
+
+
+class BreakStatementNode(StatementNode):
+    def __init__(self):
+        self.enclosing_loop_statement: Optional['WhileStatementNode'] = None
+        super().__init__()
+
+    def __str__(self):
+        return f'break_statement'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_break_statement(self)
+
+
+class ContinueStatementNode(StatementNode):
+    def __init__(self):
+        self.enclosing_loop_statement: Optional['WhileStatementNode'] = None
+        super().__init__()
+
+    def __str__(self):
+        return f'continue_statement'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_continue_statement(self)

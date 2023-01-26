@@ -42,10 +42,9 @@ def get_tokens(file: str, source: str):
     module = Module(file, source)
     lexer = Lexer(module)
     tokens: List[Token] = []
-    token = lexer.token
-    while token.kind != 'eof':
-        tokens.append(token)
-        token = lexer.scan()
+    while lexer.peek().kind != 'eof':
+        tokens.append(lexer.peek())
+        lexer.scan()
     return tokens
 
 
@@ -58,9 +57,7 @@ def run(args: argparse.Namespace, file: str, source: str):
             line, column = module.line_map.get_location(token.position)
             print(f'{file}:{line}:{column}: {token}')
 
-    lexer = Lexer(module)
-    parser = Parser(lexer)
-    program = parser.program
+    program = Parser(Lexer(module)).parse()
     program.accept(Binder(module))
     program.accept(Checker(module))
 
@@ -70,13 +67,19 @@ def run(args: argparse.Namespace, file: str, source: str):
     if args.symbols:
         program.accept(SymbolPrinter(module))
 
-    module.print_diagnostics()
-
     if module.diagnostics.has_error():
+        module.diagnostics.sort()
+        module.print_diagnostics()
         return 1
 
     emitter = Emitter(module)
     program.accept(emitter)
+
+    module.diagnostics.sort()
+    module.print_diagnostics()
+
+    if module.diagnostics.has_error():
+        return 1
 
     if args.code:
         print(str(emitter))

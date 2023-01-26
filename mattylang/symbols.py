@@ -50,26 +50,17 @@ class SymbolTable:
 
     def register(self, declaration: 'Declaration'):
         name = declaration.get_declared_name()
-        # fatal: duplicate declaration
         assert name not in self.symbols, f'fatal: symbol {name} already defined in SymbolTable {self}'
         symbol = Symbol(self, declaration)
         self.symbols[name] = symbol
         return symbol
 
-    def open_scope(self):
-        scope = SymbolTable()
-        scope.parent = self
+    def open_scope(self, boundary: bool = False):
+        scope = SymbolTable(self, boundary=boundary)
         self.children.append(scope)
         return scope
 
     def close_scope(self):
         parent = self.parent
         assert parent is not None, 'fatal: scope underflow'
-        return parent
-
-    def destroy_scope(self):
-        parent = self.parent
-        assert parent is not None, 'fatal: scope underflow'
-        parent.children.remove(self)
-        self.parent = None
         return parent

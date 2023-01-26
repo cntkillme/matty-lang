@@ -1,5 +1,5 @@
 from string import ascii_letters, digits, punctuation, whitespace
-from typing import Callable
+from typing import Callable, Optional
 
 from mattylang.module import Module
 
@@ -23,29 +23,36 @@ class Token:
 
 class Lexer:
     def __init__(self, module: Module):
-        self.module = module
-        self.source = module.source
-        self.position = 0
-        self.token = Token('eof', '', self.position)
-        self.scan()
+        self.__module = module
+        self.__source = module.source
+        self.__position = 0
+        self.__token: Optional[Token] = None
+
+    def get_module(self) -> Module:
+        return self.__module
+
+    def peek(self):
+        if self.__token is None:
+            return self.scan()
+        return self.__token
 
     def scan(self):
-        self.token = self.__scan_impl()
-        self.module.diagnostics.emit_diagnostic('info', f'syntax: scanned {self.token}', self.token.position)
-        return self.token
+        self.__token = self.__scan_impl()
+        # self.__module.diagnostics.emit_diagnostic('info', f'syntax: scanned {self.__token}', self.__token.position)
+        return self.__token
 
     __space_set = set(whitespace)
     __digit_set = set(digits)
     __id_init_set = set(ascii_letters + '$_')
     __string_char_set = set(ascii_letters + digits + punctuation + ' \t')
-    __keyword_set = {'def', 'nil', 'true', 'false'}
+    __keyword_set = {'def', 'nil', 'true', 'false', 'if', 'else', 'while', 'break', 'continue'}
     __punctuation = {'(', ')', '{', '}', '=', '!', '+', '-', '*', '/',
                      '%', '<', '>', '==', '!=', '<=', '>=', '||', '&&'}
 
     def __scan_impl(self) -> Token:
         chr = self.__get_char()
-        diagnostics = self.module.diagnostics
-        position = self.position
+        diagnostics = self.__module.diagnostics
+        position = self.__position
 
         if chr == '':  # eof
             return Token('eof', '', position)
@@ -70,10 +77,9 @@ class Lexer:
                 self.__next_char()
                 lexeme = lexeme + '.' + self.__collect_lexeme(lambda chr: chr in self.__digit_set)
 
-            # diagnostic: expected digit near decimal point
             if lexeme == '.':
                 diagnostics.emit_diagnostic('error', f'syntax: unexpected character .', position)
-                return self.__scan_impl()  # recovery: continue if unexpected character
+                return self.__scan_impl()
 
             if self.__get_char() in self.__id_init_set or self.__get_char() == '.':
                 diagnostics.emit_diagnostic(
@@ -87,7 +93,7 @@ class Lexer:
 
             if self.__get_char() != quote:
                 diagnostics.emit_diagnostic(
-                    'error', f'syntax: expected {quote} to terminate string', self.position)
+                    'error', f'syntax: expected {quote} to terminate string', self.__position)
             else:
                 self.__next_char()
 
@@ -107,19 +113,19 @@ class Lexer:
                 return self.__scan_impl()
 
     def __get_char(self):
-        return self.source[self.position] if self.position < len(self.source) else ''
+        return self.__source[self.__position] if self.__position < len(self.__source) else ''
 
     def __next_char(self):
-        if self.position < len(self.source):
-            self.position += 1
+        if self.__position < len(self.__source):
+            self.__position += 1
         return self.__get_char()
 
     def __next_char_while(self, predicate: Callable[[str], bool]):
-        while self.position < len(self.source) and predicate(self.__get_char()):
+        while self.__position < len(self.__source) and predicate(self.__get_char()):
             self.__next_char()
         return chr
 
     def __collect_lexeme(self, predicate: Callable[[str], bool]):
-        start = self.position
+        start = self.__position
         self.__next_char_while(predicate)
-        return self.source[start:self.position]
+        return self.__source[start:self.__position]

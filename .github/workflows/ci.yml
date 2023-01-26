@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-      - run: pip install -r requirements.txt
+      - run: pip install coverage unittest
       - uses: weibullguy/python-lint-plus@master
         with:
           python-root-list: mattylang tests

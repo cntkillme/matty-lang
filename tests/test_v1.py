@@ -48,8 +48,8 @@ class TestV1(unittest.TestCase):
     def __get_tokens(self, module: Module):
         lexer = Lexer(module)
         tokens: list[Token] = []
-        while lexer.token.kind != 'eof':
-            tokens.append(lexer.token)
+        while lexer.peek().kind != 'eof':
+            tokens.append(lexer.peek())
             lexer.scan()
         return tokens
 
