@@ -14,8 +14,8 @@ class LineMap:
         self.__line_starts = [0] + [i + 1 for i, c in enumerate(string) if c == '\n']
 
     # Time Complexity: Θ(1)
-    def get_position(self, line: int, column: int = 0) -> int:
-        return self.__line_starts[line - 1] + column
+    def get_position(self, line: int, column: int = 1) -> int:
+        return self.__line_starts[line - 1] + (column - 1)
 
     # Time Complexity: O(log(count('\n')))
     def get_line(self, position: int) -> int:

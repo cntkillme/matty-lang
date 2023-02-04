@@ -18,6 +18,9 @@ class Module:
         line, column = self.line_map.get_location(diagnostic.position)
         return f'{self.file}:{line}:{column}: {diagnostic}'
 
+    def print_diagnostic(self, diagnostic: Diagnostic):
+        print(self.format_diagnostic(diagnostic), file=stdout if diagnostic.kind == 'info' else stderr)
+
     def print_diagnostics(self):
         for diagnostic in self.diagnostics:
-            print(self.format_diagnostic(diagnostic), file=stdout if diagnostic.kind == 'info' else stderr)
+            self.print_diagnostic(diagnostic)
