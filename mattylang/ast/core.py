@@ -4,14 +4,15 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from mattylang.ast.type import TypeNode
+    from mattylang.symbols import SymbolTable
     from mattylang.visitor import AbstractVisitor
 
 
 class AbstractNode(ABC):
     @abstractmethod
-    def __init__(self, position: int = 0):
+    def __init__(self):
         self.parent: Optional[AbstractNode] = None
-        self.position = position
+        self.position = 0
         self.invalid = False  # if any errors are associated with this node or any child node
 
     @abstractmethod
@@ -38,4 +39,8 @@ class Declaration(ABC):
 
     @abstractmethod
     def get_declared_type(self) -> 'TypeNode':
+        pass
+
+    @abstractmethod
+    def get_declared_scope(self) -> 'SymbolTable':
         pass

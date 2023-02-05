@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from mattylang.lexer import Lexer
 from mattylang.nodes import *
 
@@ -89,8 +91,22 @@ class Parser:
             chunk = self.__parse_chunk(terminate='}')
             self.__expect('}', 'to close block')
             return chunk
-        elif token.kind == 'def':  # variable definition
-            return self.__parse_variable_definition()
+        elif token.kind == 'def':  # variable/function definition
+            self.__lexer.scan()  # skip 'def'
+            name = self.__expect('identifier', 'to name definition')
+            if name is None:
+                return None
+            identifier = IdentifierNode(name)
+            identifier.position = token.position
+
+            if self.__lexer.peek().kind == '=':  # variable definition
+                return self.__parse_variable_definition(identifier)
+            elif self.__lexer.peek().kind == '(':  # function definition
+                return self.__parse_function_definition(identifier)
+            else:
+                self.__module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: expected = or ( (got {token}) after def', token.position)
+                return None
         elif token.kind == 'if':  # if statement
             return self.__parse_if_statement()
         elif token.kind == 'while':  # while statement
@@ -101,6 +117,9 @@ class Parser:
         elif token.kind == 'continue':  # continue statement
             self.__lexer.scan()
             return ContinueStatementNode()
+        elif token.kind == 'return':  # return statement
+            self.__lexer.scan()
+            return ReturnStatementNode(self.__parse_expression())
         elif token.kind == 'identifier':  # variable assignment
             identifier = IdentifierNode(token.lexeme)
             identifier.position = token.position
@@ -112,22 +131,18 @@ class Parser:
                 self.__module.diagnostics.emit_diagnostic(
                     'error', f'syntax: unexpected {identifier}', identifier.position)
                 return None
-
         else:
-            # Greedy recovery: try to parse an expression if no statement can be parsed.
-            # This is done to minimize the number of diagnostics produced.
+            # Recovery: try to parse and ignore an expression if no statement can be parsed.
             position = token.position
             expression = self.__parse_expression()
 
-            if expression is not None:
-                expression.position = position
+            if expression is None:
                 self.__module.diagnostics.emit_diagnostic(
-                    'error', f'syntax: unexpected {expression}', position)
-                return None
-
-            self.__module.diagnostics.emit_diagnostic(
-                'error', f'syntax: expected statement (got {token})', position)
-            self.__lexer.scan()  # warning: parse_statement will advance the lexer even if no statement was parsed
+                    'error', f'syntax: expected statement (got {token})', position)
+                self.__lexer.scan()  # skip token non-expression token
+            else:
+                expression.position = position
+                self.__module.diagnostics.emit_diagnostic('error', f'syntax: unexpected {expression}', position)
             return None
 
     __binary_operators = {
@@ -137,38 +152,43 @@ class Parser:
         '*': 4, '/': 4, '%': 4,
     }
 
-    def __parse_variable_definition(self) -> VariableDefinitionNode | None:
+    def __parse_variable_definition(self, identifier: IdentifierNode) -> VariableDefinitionNode | None:
+        self.__lexer.scan()  # skip '='
+        return VariableDefinitionNode(
+            identifier, self.__expect_expression_or(f'to initialize variable {identifier.value}', NilLiteralNode()))
+
+    def __parse_function_definition(self, identifier: IdentifierNode) -> FunctionDefinitionNode | None:
         """
-        variable_definition = "def" identifier "=" expression;
-
-        Recovery: if no identifier, emit error and skip to next statement.
-        Recovery: if missing "=", or missing expression, emit error and set initializer to NilLiteralNode.
+        function_definition = "def" identifier "(" [identifier ":" type { "," identifier ":" type } [","]] ")" block;
         """
-        self.__lexer.scan()  # skip 'def'
-        name_token = self.__lexer.peek()
-        name = self.__expect('identifier', 'to name variable')
+        self.__lexer.scan()  # skip '('
 
-        if name is None:
-            return None
+        # parse parameters
+        parameters = list[Tuple[VariableDefinitionNode]]()
+        while self.__lexer.peek().kind != ')' and self.__lexer.peek().kind != 'eof':
+            position = self.__lexer.peek().position
+            parameter = self.__expect('identifier', 'to name function parameter')
 
-        if self.__expect('=', f'to initialize variable {name}') is None:
-            initializer = NilLiteralNode()
-            initializer.position = self.__lexer.peek().position
-            initializer.invalid = True
-        else:
-            # MattyLang v2.0 idea: allow explicit typing of variables with a sane default if no initializer is provided.
-            initializer = self.__expect_expression_or(f'to initialize variable {name}', NilLiteralNode())
+            if parameter is None:
+                if not self.__parse_expression():  # recovery: parse expression to provide better diagnostics
+                    self.__lexer.scan()  # skip token if no expression parsed
+                continue
 
-        identifier = IdentifierNode(name)
-        identifier.position = name_token.position
-        return VariableDefinitionNode(identifier, initializer)
+            identifier = IdentifierNode(parameter)
+            identifier.position = position
+            parameters.append(identifier)
+
+            if self.__lexer.peek().kind == ',':
+                self.__lexer.scan()  # skip ','
+            elif self.__lexer.peek().kind != ')':
+                self.__module.diagnostics.emit_diagnostic(
+                    'error', f'syntax: expected , or ) (got {self.__lexer.peek()}) in function definition', self.__lexer.peek().position)
+
+        self.__expect(')', 'to close function definition')
+
+        return FunctionDefinitionNode(identifier, parameters, self.__expect_statement_or('to define function body', ChunkNode()))
 
     def __parse_variable_assignment(self, identifier: IdentifierNode) -> VariableAssignmentNode | None:
-        """
-        variable_assignment = identifier "=" expression;
-
-        Recovery: if missing "=", or missing expression, emit error and skip.
-        """
         self.__lexer.scan()  # skip '='
         initializer = self.__expect_expression(f'to assign variable {identifier.value}')
         if initializer is None:

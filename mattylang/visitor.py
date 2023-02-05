@@ -50,6 +50,23 @@ class AbstractVisitor(ABC):
     def visit_continue_statement(self, node: 'ContinueStatementNode'):
         pass
 
+    def visit_function_definition(self, node: 'FunctionDefinitionNode'):
+        node.identifier.accept(self)
+        node.invalid = node.invalid or node.identifier.invalid
+        for parameter in node.parameters:
+            parameter.accept(self)
+            node.invalid = node.invalid or parameter.invalid
+        node.body.accept(self)
+        node.invalid = node.invalid or node.body.invalid
+
+    def visit_return_statement(self, node: 'ReturnStatementNode'):
+        if node.value is not None:
+            node.value.accept(self)
+            node.invalid = node.invalid or node.value.invalid
+
+    def visit_call_statement(self, node: 'CallStatementNode'):
+        node.call_expression.accept(self)
+
     def visit_unary_expression(self, node: 'UnaryExpressionNode'):
         node.operand.accept(self)
         node.invalid = node.invalid or node.operand.invalid
@@ -73,6 +90,32 @@ class AbstractVisitor(ABC):
 
     def visit_identifier(self, node: 'IdentifierNode'):
         pass
+
+    def visit_call_expression(self, node: 'CallExpressionNode'):
+        node.identifier.accept(self)
+        node.invalid = node.invalid or node.identifier.invalid
+        for argument in node.arguments:
+            argument.accept(self)
+            node.invalid = node.invalid or argument.invalid
+
+    def visit_nil_type(self, node: 'NilTypeNode'):
+        pass
+
+    def visit_bool_type(self, node: 'BoolTypeNode'):
+        pass
+
+    def visit_real_type(self, node: 'RealTypeNode'):
+        pass
+
+    def visit_string_type(self, node: 'StringTypeNode'):
+        pass
+
+    def visit_function_type(self, node: 'FunctionTypeNode'):
+        for parameter in node.parameter_types:
+            parameter.accept(self)
+            node.invalid = node.invalid or parameter.invalid
+        node.return_type.accept(self)
+        node.invalid = node.invalid or node.return_type.invalid
 
 
 class ScopedVisitor(AbstractVisitor, ABC):

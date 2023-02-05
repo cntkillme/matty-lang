@@ -21,6 +21,7 @@ def main() -> None:
     parser.add_argument('--syntax', action='store_true', help='print the syntax tree')
     parser.add_argument('--symbols', action='store_true', help='print the symbol table')
     parser.add_argument('--code', action='store_true', help='print the generated code')
+    parser.add_argument('--no-analysis', action='store_true', help='skip semantic analysis')
     parsed = parser.parse_args()
 
     if parsed.file:
@@ -58,8 +59,10 @@ def run(args: argparse.Namespace, file: str, source: str):
             print(f'{file}:{line}:{column}: {token}')
 
     program = Parser(Lexer(module)).parse()
-    program.accept(Binder(module))
-    program.accept(Checker(module))
+
+    if not args.no_analysis:
+        program.accept(Binder(module))
+        program.accept(Checker(module))
 
     if args.syntax:
         program.accept(Printer(module))
@@ -71,6 +74,9 @@ def run(args: argparse.Namespace, file: str, source: str):
         module.diagnostics.sort()
         module.print_diagnostics()
         return 1
+
+    if args.no_analysis:
+        return 0
 
     emitter = Emitter(module)
     program.accept(emitter)

@@ -45,9 +45,10 @@ class Lexer:
     __digit_set = set(digits)
     __id_init_set = set(ascii_letters + '$_')
     __string_char_set = set(ascii_letters + digits + punctuation + ' \t')
-    __keyword_set = {'def', 'nil', 'true', 'false', 'if', 'else', 'while', 'break', 'continue'}
+    __keyword_set = {'def', 'nil', 'true', 'false', 'if', 'else', 'while',
+                     'break', 'continue', 'return', 'Nil', 'Bool', 'Real', 'String'}
     __punctuation = {'(', ')', '{', '}', '=', '!', '+', '-', '*', '/',
-                     '%', '<', '>', '==', '!=', '<=', '>=', '||', '&&'}
+                     '%', '<', '>', '==', '!=', '<=', '>=', '||', '&&', '->'}
 
     def __scan_impl(self) -> Token:
         chr = self.__get_char()

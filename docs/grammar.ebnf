@@ -17,7 +17,7 @@ break_statement = "break";
 continue_statement = "continue";
 
 (* v0.3 *)
-function_definition = "def" identifier "(" [identifier ":" type { "," identifier ":" type } [","]] ")" block;
+function_definition = "def" identifier "(" [identifier ":" type { "," identifier ":" type } [","]] ")" statement;
 return_statement = "return" [expression];
 call_statement = call_expression;
 

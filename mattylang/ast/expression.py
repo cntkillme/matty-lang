@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import List, TYPE_CHECKING, Optional
 
 from mattylang.ast.core import AbstractNode
 
@@ -118,3 +118,19 @@ class IdentifierNode(PrimaryExpressionNode):
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_identifier(self)
+
+
+class CallExpressionNode(PrimaryExpressionNode):
+    def __init__(self, target: IdentifierNode, arguments: List[ExpressionNode]):
+        super().__init__()
+        target.parent = self
+        self.identifier = target
+        for argument in arguments:
+            argument.parent = self
+        self.arguments = arguments
+
+    def __str__(self):
+        return f'call_expression({self.identifier.value})'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_call_expression(self)

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 from mattylang.ast.core import AbstractNode, Declaration
 
 if TYPE_CHECKING:
-    from mattylang.ast.expression import ExpressionNode, IdentifierNode
+    from mattylang.ast.expression import ExpressionNode, IdentifierNode, CallExpressionNode
     from mattylang.ast.type import TypeNode
     from mattylang.symbols import SymbolTable
     from mattylang.visitor import AbstractVisitor
@@ -54,6 +54,11 @@ class VariableDefinitionNode(StatementNode, Declaration):
         assert symbol is not None, 'fatal: symbol not set'
         assert symbol.type is not None, 'fatal: symbol type not set'
         return symbol.type
+
+    def get_declared_scope(self) -> 'SymbolTable':
+        symbol = self.identifier.symbol
+        assert symbol is not None, 'fatal: symbol not set'
+        return symbol.scope
 
 
 class VariableAssignmentNode(StatementNode):
@@ -109,7 +114,6 @@ class WhileStatementNode(StatementNode):
 
 class BreakStatementNode(StatementNode):
     def __init__(self):
-        self.enclosing_loop_statement: Optional['WhileStatementNode'] = None
         super().__init__()
 
     def __str__(self):
@@ -118,10 +122,12 @@ class BreakStatementNode(StatementNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_break_statement(self)
 
+    def get_enclosing_loop_statement(self):
+        return self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode))
+
 
 class ContinueStatementNode(StatementNode):
     def __init__(self):
-        self.enclosing_loop_statement: Optional['WhileStatementNode'] = None
         super().__init__()
 
     def __str__(self):
@@ -129,3 +135,69 @@ class ContinueStatementNode(StatementNode):
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_continue_statement(self)
+
+    def get_enclosing_loop_statement(self):
+        return self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode))
+
+
+class FunctionDefinitionNode(StatementNode, Declaration):
+    def __init__(self, identifier: 'IdentifierNode', parameters: List[VariableDefinitionNode], body: StatementNode):
+        super().__init__()
+        identifier.parent = self
+        self.identifier = identifier
+        for parameter in parameters:
+            parameter.parent = self
+        self.parameters = parameters
+        body.parent = self
+        self.body = body
+        self.invalid = identifier.invalid or any(parameter.invalid for parameter in parameters) or body.invalid
+
+    def __str__(self):
+        return f'function_definition({self.identifier}): ({", ".join(parameter.value for parameter in self.parameters)})'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_function_definition(self)
+
+    def get_declared_name(self) -> str:
+        return self.identifier.value
+
+    def get_declared_type(self) -> 'TypeNode':
+        symbol = self.identifier.symbol
+        assert symbol is not None, 'fatal: symbol not set'
+        assert symbol.type is not None, 'fatal: symbol type not set'
+        return symbol.type
+
+    def get_declared_scope(self) -> 'SymbolTable':
+        symbol = self.identifier.symbol
+        assert symbol is not None, 'fatal: symbol not set'
+        return symbol.scope
+
+
+class ReturnStatementNode(StatementNode):
+    def __init__(self, value: Optional['ExpressionNode'] = None):
+        super().__init__()
+        if value:
+            value.parent = self
+            self.invalid = value.invalid
+        self.value = value
+
+    def __str__(self):
+        return f'return_statement'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_return_statement(self)
+
+    def get_enclosing_function_definition(self):
+        return self.get_first_ancestor(lambda parent: isinstance(parent, FunctionDefinitionNode))
+
+
+class CallStatementNode(StatementNode):
+    def __init__(self, call_expression: 'CallExpressionNode'):
+        super().__init__()
+        self.call_expression = call_expression
+
+    def __str__(self):
+        return f'call_statement({self.call_expression})'
+
+    def accept(self, visitor: 'AbstractVisitor'):
+        visitor.visit_call_statement(self)
