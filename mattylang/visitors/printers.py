@@ -3,7 +3,7 @@ from mattylang.nodes import *
 from mattylang.visitor import AbstractVisitor, ScopedVisitor
 
 
-class Printer(AbstractVisitor):
+class AstPrinter(AbstractVisitor):
     def __init__(self, module: Module, indent: int = 0):
         super().__init__()
         self.module = module
@@ -15,22 +15,37 @@ class Printer(AbstractVisitor):
         super().visit_program(node)
         self.__indent -= 1
 
+    def visit_nil_type(self, node: 'NilTypeNode'):
+        self.__header(node)
+
+    def visit_bool_type(self, node: 'BoolTypeNode'):
+        self.__header(node)
+
+    def visit_real_type(self, node: 'RealTypeNode'):
+        self.__header(node)
+
+    def visit_string_type(self, node: 'StringTypeNode'):
+        self.__header(node)
+
+    def visit_function_type(self, node: 'FunctionTypeNode'):
+        self.__header(node)
+
     def visit_chunk(self, node: ChunkNode):
         self.__header(node)
         self.__indent += 1
         super().visit_chunk(node)
         self.__indent -= 1
 
-    def visit_variable_definition(self, node: VariableDefinitionNode):
-        self.__header(node)
-        self.__indent += 1
-        super().visit_variable_definition(node)
-        self.__indent -= 1
-
     def visit_variable_assignment(self, node: VariableAssignmentNode):
         self.__header(node)
         self.__indent += 1
         super().visit_variable_assignment(node)
+        self.__indent -= 1
+
+    def visit_variable_definition(self, node: VariableDefinitionNode):
+        self.__header(node)
+        self.__indent += 1
+        super().visit_variable_definition(node)
         self.__indent -= 1
 
     def visit_if_statement(self, node: IfStatementNode):
@@ -55,6 +70,14 @@ class Printer(AbstractVisitor):
         self.__header(node)
         self.__indent += 1
         super().visit_function_definition(node)
+
+        node.identifier.accept(self)
+        self.__indent += 1
+        for parameter in node.parameters:
+            parameter.accept(self)
+        self.__indent -= 1
+        node.body.accept(self)
+
         self.__indent -= 1
 
     def visit_return_statement(self, node: ReturnStatementNode):
@@ -68,18 +91,6 @@ class Printer(AbstractVisitor):
         self.__indent += 1
         super().visit_call_statement(node)
         self.__indent += 1
-
-    def visit_unary_expression(self, node: UnaryExpressionNode):
-        self.__header(node)
-        self.__indent += 1
-        super().visit_unary_expression(node)
-        self.__indent -= 1
-
-    def visit_binary_expression(self, node: BinaryExpressionNode):
-        self.__header(node)
-        self.__indent += 1
-        super().visit_binary_expression(node)
-        self.__indent -= 1
 
     def visit_nil_literal(self, node: NilLiteralNode):
         self.__header(node)
@@ -102,17 +113,24 @@ class Printer(AbstractVisitor):
         super().visit_call_expression(node)
         self.__indent -= 1
 
+    def visit_unary_expression(self, node: UnaryExpressionNode):
+        self.__header(node)
+        self.__indent += 1
+        super().visit_unary_expression(node)
+        self.__indent -= 1
+
+    def visit_binary_expression(self, node: BinaryExpressionNode):
+        self.__header(node)
+        self.__indent += 1
+        super().visit_binary_expression(node)
+        self.__indent -= 1
+
     def __write(self, text: str):
         print('  ' * self.__indent + text)
 
     def __header(self, node: AbstractNode):
         line, column = self.module.line_map.get_location(node.position)
-        src_ctx = f'<{line}, {column}>'
-
-        if node.invalid:
-            self.__write(f'\u001b[41m{node}\u001b[0m {src_ctx}')
-        else:
-            self.__write(f'{node} {src_ctx}')
+        self.__write(f'{node} <{line}, {column}>')
 
 
 class SymbolPrinter(ScopedVisitor):
@@ -127,8 +145,8 @@ class SymbolPrinter(ScopedVisitor):
         self.__write('{')
         self.__indent += 1
 
-        if node.symbol_table is not None:
-            for symbol in node.symbol_table.symbols.values():
+        if node.symbols is not None:
+            for symbol in node.symbols.variables.values():
                 self.__write(str(symbol))
 
         super().visit_chunk(node)

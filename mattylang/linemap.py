@@ -4,8 +4,8 @@ from typing import Tuple
 
 class LineMap:
     """
-    A memory-efficient data structure that provides a mapping between character positions and their line and column.
-    This allows for only the position to be stored, instead of both a line and column, reducing overall memory usage.
+    A memory-efficient data structure that provides a mapping between character positions and their location (line, column).
+    This allows for only the position to be stored per node, reducing complexity and overall memory usage.
     """
 
     # Time Complexity: Θ(len(string))

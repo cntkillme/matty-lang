@@ -1,54 +1,49 @@
-program = chunk EOF; (* v0.1 *)
+program = { statement } EOF;
 
+(*** statements ***)
 (* abstract *)
-statement = "{" chunk "}" | variable_definition | variable_assignment; (* v0.1 *)
-statement = if_statement | while_statement | break_statement | continue_statement; (* v0.2 *)
-statement = function_definition | return_statement | call_statement; (* v0.3 *)
+statement = "{" { statement } "}"; (* compound statement *)
+statement = variable_definition | variable_assignment;
+statement = if_statement | while_statement | break_statement | continue_statement;
+statement = function_definition | return_statement | call_statement;
 
-(* v0.1 *)
-chunk = { statement };
+(* concrete *)
+chunk = statement | "{" { statement } "}";
 variable_definition = "def" identifier "=" expression;
 variable_assignment = identifier "=" expression;
-
-(* v0.2 *)
-if_statement = "if" "(" expression ")" statement ["else" statement];
-while_statement = "while" "(" expression ")" statement;
+if_statement = "if" "(" expression ")" chunk ["else" chunk];
+while_statement = "while" "(" expression ")" chunk;
 break_statement = "break";
 continue_statement = "continue";
-
-(* v0.3 *)
-function_definition = "def" identifier "(" [identifier ":" type { "," identifier ":" type } [","]] ")" statement;
+function_definition = "def" identifier "(" [variable_declaration { "," variable_declaration } [","]] ")" "{" { statement } "}";
+function_parameter = identifier ":" type;
 return_statement = "return" [expression];
 call_statement = call_expression;
 
+(*** expressions ***)
 (* abstract *)
-expression = "(" expression ")"; (* v0.1 *)
-expression = primary_expression | unary_expression | binary_expression; (* v0.1; v0.3 *)
+expression = "(" expression ")";
+expression = primary_expression | unary_expression | binary_expression; (* operator-precedence parsing *)
+primary_expression = nil_literal | bool_literal | real_literal | string_literal | identifier | call_expression;
 
-(* v0.1 *)
-unary_expression = ("-" | "!") expression;
-binary_expression = expression ("+" | "-" | "*" | "/" | "%" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "||" | "&&") expression;
-
-(* abstract *)
-primary_expression = nil_literal | bool_literal | real_literal | string_literal | identifier; (* v0.1 *)
-primary_expression = call_expression; (* v0.3 *)
-
-(* v0.1 *)
+(* concrete *)
 nil_literal = "nil";
 bool_literal = "true" | "false";
 real_literal = DIGIT { DIGIT } "." { DIGIT } | "." DIGIT { DIGIT };
 string_literal = "'" { GRAPHICAL | " " | "\t" } "'" | '"' { GRAPHICAL | " " | "\t" } '"';
 identifier = { ALPHABETICAL | "$" | "_" } { ALPHANUMERIC | "$" | "_" };
-
-(* v0.3 *)
 call_expression = identifier "(" [expression { "," expression } [","]] ")";
+unary_expression = ("-" | "!") expression;
+binary_expression = expression ("+" | "-" | "*" | "/" | "%" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "||" | "&&") expression;
 
+(*** types ***)
 (* abstract *)
-type = primitive_type; (* v0.1 *)
-type = function_type; (* v0.3 *)
+type = primitive_type | function_type;
+primitive_type = nil_type | bool_type | real_type | string_type;
 
-(* v0.1 *)
-primitive_type = "Nil" | "Bool" | "Real" | "String";
-
-(* v0.3 *)
+(* concrete *)
+nil_type = "Nil";
+bool_type = "Bool";
+real_type = "Real";
+string_type = "String";
 function_type = "(" [{ type "," } type [","]] ")" "->" type;

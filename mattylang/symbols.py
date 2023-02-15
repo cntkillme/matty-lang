@@ -1,36 +1,49 @@
-from typing import TYPE_CHECKING, Dict, List, Optional
-
-from mattylang.ast.core import Declaration
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mattylang.ast.expression import IdentifierNode
-    from mattylang.ast.type import TypeNode
+    from mattylang.ast import *
 
 
 class Symbol:
-    def __init__(self, scope: 'SymbolTable', declaration: 'Declaration'):
+    """
+    A symbol represents a registered variable declaration in the program.
+    """
+
+    def __init__(self, name: str, scope: 'SymbolTable', extern: bool = False, node: Optional['AbstractNode'] = None, type: Optional['TypeNode'] = None):
+        self.name = name
         self.scope = scope
-        self.declaration = declaration
-        self.references: List['IdentifierNode'] = []
-        self.type: Optional['TypeNode'] = None
+        self.extern = extern
+        self.references: List[IdentifierNode] = []  # set by binder
+        self.node = node  # set by binder
+        self.type = type  # set by checker
 
     def __str__(self):
-        return f'symbol({self.declaration.get_declared_name()})'
+        return f'symbol(name: {self.name}, node: {self.node}, type: {self.type})'
+
+    def get_node(self) -> 'AbstractNode':
+        assert self.node is not None, 'node is not set for {self}, was the binder run?'
+        return self.node
+
+    def get_type(self) -> 'TypeNode':
+        assert self.type is not None, 'type is not set for {self}, was the checker run?'
+        return self.type
 
 
 class SymbolTable:
     """
-    A data structure used to store symbols and their declarations.
+    A symbol table represents a lexical scope in the program.
+    It maps symbol names to declaration information through symbols.
     """
 
     def __init__(self, parent: Optional['SymbolTable'] = None, boundary: bool = False):
         self.parent = parent  # represents the scope this scope is nested within
         self.children: List[SymbolTable] = []  # represents the scopes nested within this scope
-        self.symbols: Dict[str, Symbol] = {}  # represents the symbols declared in this scope
         self.boundary = boundary  # represents whether this scope is a boundary (e.g., at function definitions)
+        self.variables: Dict[str, Symbol] = {}  # represents the variables declared in this scope
 
-    def __str__(self):
-        return f'symbol_table({len(self.symbols)}, boundary={self.boundary})'
+    def reset(self):
+        self.children.clear()
+        self.variables.clear()
 
     def enclosing_boundary(self) -> Optional['SymbolTable']:
         if self.parent is None:
@@ -41,18 +54,17 @@ class SymbolTable:
             return self.parent.enclosing_boundary()
 
     def lookup(self, name: str, recursive: bool = True, ignore_boundary: bool = False) -> Optional[Symbol]:
-        if name in self.symbols:
-            return self.symbols[name]
+        if name in self.variables:
+            return self.variables[name]
         elif recursive and self.parent is not None and (ignore_boundary or not self.boundary):
             return self.parent.lookup(name, True, ignore_boundary)
         else:
             return None
 
-    def register(self, declaration: 'Declaration'):
-        name = declaration.get_declared_name()
-        assert name not in self.symbols, f'fatal: symbol {name} already defined in SymbolTable {self}'
-        symbol = Symbol(self, declaration)
-        self.symbols[name] = symbol
+    def register(self, name: str, extern: bool = False, node: Optional['AbstractNode'] = None, type: Optional['TypeNode'] = None) -> Symbol:
+        assert name not in self.variables, f'fatal: symbol {name} already defined'
+        symbol = Symbol(name, self, extern, node, type)
+        self.variables[name] = symbol
         return symbol
 
     def open_scope(self, boundary: bool = False):

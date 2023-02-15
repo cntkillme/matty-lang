@@ -34,14 +34,12 @@ class Diagnostics:
     def has_error(self):
         return self.__has_error
 
-    def emit_diagnostic(self, kind: DiagnosticKind, message: str, position: int = 0):
-        diagnostic = Diagnostic(kind, message, position)
-        if diagnostic.kind == 'info' and not self.__verbose:
-            return
-        elif diagnostic.kind == 'error':
-            self.__has_error = True
-
-        self.__diagnostics.append(diagnostic)
-
     def sort(self):
         self.__diagnostics.sort(key=lambda diagnostic: diagnostic.position)
+
+    def emit_diagnostic(self, kind: DiagnosticKind, message: str, position: int = -1):
+        if kind == 'info' and not self.__verbose:
+            return
+        elif kind == 'error':
+            self.__has_error = True
+        self.__diagnostics.append(Diagnostic(kind, message, position))

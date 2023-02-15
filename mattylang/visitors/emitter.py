@@ -1,15 +1,56 @@
-from mattylang.module import Module
 from mattylang.nodes import *
-from mattylang.visitor import ScopedVisitor
+from mattylang.visitor import AbstractVisitor
 
 
-class Emitter(ScopedVisitor):
+# Renames variables to handle collisions of variables within the same function scope in Python.
+# TODO(v2.0): handle collisions of variables that are named Python keywords
+class PythonSafeVariableRenamer(AbstractVisitor):
     def __init__(self, module: Module):
-        super().__init__(module)
+        super().__init__()
+        self.module = module
+
+    def visit_variable_declaration(self, node: VariableDeclarationNode):
+        symbol = node.identifier.get_symbol()
+        name = symbol.name
+        new_name = name
+
+        # generate a new variable name if the current name was previously used
+        if symbol.scope.parent is not None:
+            i = 1
+            while symbol.scope.parent.lookup(new_name, True) is not None:
+                new_name = f'{name}_{i}'
+                i += 1
+
+        # skip renaming if name is not previously used
+        if name == new_name:
+            return
+
+        # rename the variable in the symbol table
+        del symbol.scope.variables[name]
+        symbol.scope.variables[new_name] = symbol
+        symbol.name = new_name
+
+        # rename the variable references
+        for identifier in symbol.references:
+            identifier.value = new_name
+
+        self.module.diagnostics.emit_diagnostic(
+            'info', f'emitter: renamed variable {name} to {new_name}', node.identifier.position)
+
+        # visit children
+        super().visit_variable_declaration(node)
+
+
+class Emitter(AbstractVisitor):
+    def __init__(self, module: Module):
+        super().__init__()
+        self.module = module
         self.__lines = list[str]()
         self.__statement: str = ''
         self.__depth: int = 0
-        self.__renamed: set[VariableDefinitionNode] = set()
+
+        #
+        # TODO: Rename variables to avoid collisions with Python keywords.
 
     def __str__(self):
         return '\n'.join(self.__lines)
@@ -18,36 +59,38 @@ class Emitter(ScopedVisitor):
         self.__lines.append(('    ' * self.__depth) + stmt)
 
     def visit_program(self, node: ProgramNode):
-        assert not node.invalid, 'invalid program'
         super().visit_program(node)
 
     def visit_chunk(self, node: ChunkNode):
         # Since Python does not have proper lexical scoping, variables must be renamed to avoid collisions.
         for statement in node.statements:
-            if isinstance(statement, VariableDefinitionNode) and not statement in self.__renamed:
-                symbol = statement.identifier.symbol
-                if symbol is not None:
-                    name = statement.identifier.value
-                    del symbol.scope.symbols[name]
-                    new_name = name
+            if isinstance(statement, VariableDeclarationNode):
+                symbol = statement.identifier.get_symbol()
+                name = symbol.name
+                new_name = name
 
-                    # Append underscores while there is a collision
-                    while symbol.scope.lookup(new_name, True) is not None:
-                        new_name += '_'
+                # generate a new variable name if the current name was previously used
+                if symbol.scope.parent is not None:
+                    i = 1
+                    while symbol.scope.parent.lookup(new_name, True) is not None:
+                        new_name = f'{name}_{i}'
+                        i += 1
 
-                    if name == new_name:
-                        symbol.scope.symbols[name] = symbol
-                        continue
+                # skip renaming if name is not previously used
+                if name == new_name:
+                    continue
 
-                    self.module.diagnostics.emit_diagnostic(
-                        'info', f'emitter: renamed variable {name} to {new_name}', statement.identifier.position)
+                # rename the variable references
+                for identifier in symbol.references:
+                    identifier.value = new_name
 
-                    for identifier in symbol.references:
-                        identifier.value = new_name
+                # rename the variable in the symbol table
+                del symbol.scope.variables[name]
+                symbol.scope.variables[new_name] = symbol
+                symbol.name = new_name
 
-                    symbol.scope.symbols[new_name] = symbol
-
-                    self.__renamed.add(statement)
+                self.module.diagnostics.emit_diagnostic(
+                    'info', f'emitter: renamed variable {name} to {new_name}', statement.identifier.position)
 
         super().visit_chunk(node)
 

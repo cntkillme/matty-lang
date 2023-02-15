@@ -1,12 +1,14 @@
 from mattylang.module import Module
 from mattylang.nodes import *
-from mattylang.visitor import ScopedVisitor
+from mattylang.visitor import AbstractVisitor
 
 
-class Checker(ScopedVisitor):
+class Checker(AbstractVisitor):
     def __init__(self, module: Module):
-        super().__init__(module)
+        super().__init__()
+        self.module = module
         self.__enclosed_loop_statement: Optional[WhileStatementNode] = None
+        self.__enclosed_function_definition: Optional[FunctionDefinitionNode] = None
 
     def is_equivalent(self, left: TypeNode, right: TypeNode):
         if left is None or right is None:
@@ -17,12 +19,10 @@ class Checker(ScopedVisitor):
         node.initializer.accept(self)
 
         if node.identifier.symbol is None:
-            node.invalid = True
             return
 
         node.identifier.symbol.type = node.initializer.type
         node.identifier.accept(self)
-        node.invalid = node.invalid or node.identifier.invalid or node.initializer.invalid
 
     def visit_variable_assignment(self, node: VariableAssignmentNode):
         super().visit_variable_assignment(node)  # visit children
@@ -31,11 +31,9 @@ class Checker(ScopedVisitor):
 
         # Another diagnostic should have been emitted if it has no type.
         if identifier_type is None or value_type is None:
-            node.invalid = True
             return
 
         if identifier_type is None or value_type is None or not identifier_type.is_equivalent(value_type):
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: incompatible types for assignment: {identifier_type} = {value_type}', node.position)
             return
@@ -46,11 +44,9 @@ class Checker(ScopedVisitor):
 
         # Another diagnostic should have been emitted if it has no type.
         if condition_type is None:
-            node.invalid = True
             return
 
         if not condition_type.is_equivalent(BoolTypeNode()):
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: expected type of condition to be Bool (got {condition_type})', node.condition.position)
             return
@@ -64,24 +60,20 @@ class Checker(ScopedVisitor):
 
         # Another diagnostic should have been emitted if it has no type.
         if condition_type is None:
-            node.invalid = True
             return
 
         if not condition_type.is_equivalent(BoolTypeNode()):
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: expected type of condition to be Bool (got {condition_type})', node.condition.position)
             return
 
     def visit_break_statement(self, node: BreakStatementNode):
         if self.__enclosed_loop_statement is None:
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', 'analysis: break statement outside of loop', node.position)
 
     def visit_continue_statement(self, node: ContinueStatementNode):
         if self.__enclosed_loop_statement is None:
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', 'analysis: continue statement outside of loop', node.position)
 
@@ -89,12 +81,10 @@ class Checker(ScopedVisitor):
         super().visit_unary_expression(node)  # visit children
         operator, value_type = node.operator, node.operand.type
         if value_type is None:
-            node.invalid = True
             return
 
         if operator == '-':
             if not value_type.is_equivalent(RealTypeNode()):
-                node.invalid = True
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
                 return
@@ -102,7 +92,6 @@ class Checker(ScopedVisitor):
             node.type = value_type
         elif operator == '!':
             if not value_type.is_equivalent(BoolTypeNode()):
-                node.invalid = True
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
                 return
@@ -119,10 +108,8 @@ class Checker(ScopedVisitor):
 
         # Another diagnostic should have been emitted for if it has no type.
         if left_type is None or right_type is None:
-            node.invalid = True
             return
 
-        node.invalid = node.invalid or left.invalid or right.invalid or left_type.invalid or right_type.invalid
         type_error = left_type is None or right_type is None or not left_type.is_equivalent(right_type)
         result_type = left_type
 
@@ -145,7 +132,6 @@ class Checker(ScopedVisitor):
             assert False, f'binary operator {operator} is invalid'  # lexer invariant: all binary operators are valid
 
         if type_error:
-            node.invalid = True
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: incompatible operand types for expression: {left_type} {operator} {right_type}', node.position)
             return
