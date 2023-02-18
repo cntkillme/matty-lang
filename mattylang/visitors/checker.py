@@ -31,7 +31,7 @@ class Checker(AbstractVisitor):
                 'error', f'analysis: incompatible types for assignment: {identifier_type} = {value_type}', node.position)
             return
 
-    def visit_if_statement(self, node: 'IfStatementNode'):
+    def visit_if_statement(self, node: IfStatementNode):
         node.condition.accept(self)
         condition_type = node.condition.type
 
@@ -44,7 +44,7 @@ class Checker(AbstractVisitor):
         if node.else_body is not None:
             node.else_body.accept(self)
 
-    def visit_while_statement(self, node: 'WhileStatementNode'):
+    def visit_while_statement(self, node: WhileStatementNode):
         node.condition.accept(self)
         condition_type = node.condition.type
 
@@ -65,13 +65,13 @@ class Checker(AbstractVisitor):
             self.module.diagnostics.emit_diagnostic(
                 'error', 'analysis: continue statement outside of loop', node.position)
 
-    def visit_function_definition(self, node: 'FunctionDefinitionNode'):
+    def visit_function_definition(self, node: FunctionDefinitionNode):
         super().visit_function_definition(node)  # visit children
 
-    def visit_function_parameter(self, node: 'FunctionParameterNode'):
+    def visit_function_parameter(self, node: FunctionParameterNode):
         super().visit_function_parameter(node)  # visit children
 
-    def visit_return_statement(self, node: 'ReturnStatementNode'):
+    def visit_return_statement(self, node: ReturnStatementNode):
         super().visit_return_statement(node)  # visit children
         enclosing_function = node.get_enclosing_function_definition()
 
@@ -87,8 +87,8 @@ class Checker(AbstractVisitor):
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: incompatible return type {return_type}, expected {chunk_type}', return_type.position)
             return
-
-        enclosing_function.body.return_type = return_type
+        elif chunk_type is None:
+            enclosing_function.body.return_type = return_type
 
     def visit_nil_literal(self, node: NilLiteralNode):
         node.type = NilTypeNode()
@@ -106,7 +106,13 @@ class Checker(AbstractVisitor):
         if node.symbol is not None:
             node.type = node.symbol.type
 
-    def visit_call_expression(self, node: 'CallExpressionNode'):
+    def visit_call_expression(self, node: CallExpressionNode):
+        parameter_types: List[TypeNode] = []
+        for argument in node.arguments:
+            argument.accept(self)
+            parameter_types.append(argument.type or AnyTypeNode())
+        #
+
         return super().visit_call_expression(node)  # visit children
 
     def visit_unary_expression(self, node: UnaryExpressionNode):
@@ -147,19 +153,20 @@ class Checker(AbstractVisitor):
 
         if operator == '+':
             result_type = left_type
-            type_error = type_error or not (left_type.is_equivalent(RealTypeNode())
-                                            or left_type.is_equivalent(StringTypeNode()))
+            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode())
+                                            or left_type.is_assignable_to(StringTypeNode()))
         elif operator in {'-', '*', '/', '%'}:
             result_type = left_type
-            type_error = type_error or not left_type.is_equivalent(RealTypeNode())
+            type_error = type_error or not left_type.is_assignable_to(RealTypeNode())
         elif operator in {'==', '!='}:
             result_type = BoolTypeNode()
         elif operator in {'<', '<=', '>', '>='}:
             result_type = BoolTypeNode()
-            type_error = type_error or not left_type.is_three_way_comparable()
+            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode())
+                                            or left_type.is_assignable_to(StringTypeNode()))
         elif operator in {'||', '&&'}:
             result_type = BoolTypeNode()
-            type_error = type_error or not left_type.is_equivalent(BoolTypeNode())
+            type_error = type_error or not left_type.is_assignable_to(BoolTypeNode())
         else:
             assert False, f'binary operator {operator} is invalid'  # lexer invariant: all binary operators are valid
 

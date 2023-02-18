@@ -304,9 +304,9 @@ class IdentifierNode(PrimaryExpressionNode):
 class CallExpressionNode(PrimaryExpressionNode):
     def __init__(self, identifier: IdentifierNode, arguments: List[ExpressionNode], position: int = -1):
         super().__init__(position)
-        self.symbol: Optional[Symbol] = None  # set by the binder
         self.identifier, self.arguments = identifier, arguments
-
+        self.symbol: Optional[Symbol] = None  # set by the binder
+        self.type: Optional[FunctionTypeNode] = None  # set by the checker
         identifier.parent = self
         for argument in arguments:
             argument.parent = self

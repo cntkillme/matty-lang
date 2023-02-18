@@ -82,7 +82,7 @@ def run(args: argparse.Namespace, file: str, source: str, no_default_output: boo
 
     if args.output:
         new_file = args.output
-    elif file != '<stdin>':
+    elif not no_default_output:
         new_file = file.split('/')[-1].split('\\')[-1]  # get file name
         new_file = new_file.rsplit('.mtl', 1)[0] + '.py'  # remove .mtl extension, add .py extension
 

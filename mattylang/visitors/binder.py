@@ -44,10 +44,10 @@ class Binder(AbstractVisitor):
         if symbol is not None:
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: duplicate definition of {node.identifier.value}', node.identifier.position)
-
-        # register symbol
-        self.__active_scope.register(node.identifier.value, node=node)
-        node.identifier.accept(self)
+        else:
+            # register symbol
+            self.__active_scope.register(node.identifier.value, node=node)
+            node.identifier.accept(self)
 
         # visit children in new boundary scope
         self.__active_scope = self.__active_scope.open_scope(boundary=True)
