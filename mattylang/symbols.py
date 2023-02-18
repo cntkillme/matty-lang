@@ -28,6 +28,23 @@ class Symbol:
         assert self.type is not None, 'type is not set for {self}, was the checker run?'
         return self.type
 
+    def rename(self, new_name: str):
+        scope = self.scope
+        assert new_name not in scope.variables, f'fatal: symbol {new_name} already defined'
+
+        # rename symbol
+        scope.variables[new_name] = self
+        del scope.variables[self.name]
+        self.name = new_name
+
+        # rename references
+        for identifier in self.references:
+            identifier.value = new_name
+
+    def erase(self):
+        assert self.name in self.scope.variables, f'fatal: symbol {self.name} not defined'
+        del self.scope.variables[self.name]
+
 
 class SymbolTable:
     """

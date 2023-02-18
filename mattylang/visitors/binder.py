@@ -14,44 +14,45 @@ class Binder(AbstractVisitor):
         assert node.symbol_table is None, f'fatal: {node} already has symbol table: {node.symbol_table}'
         self.__active_scope = self.__active_scope.open_scope()
         node.symbol_table = self.__active_scope
-
-        # visit children
-        super().visit_chunk(node)
+        super().visit_chunk(node)  # visit children
 
         # handle undefined references
         for identifier in self.__undefined_references:
-            # TODO: allow forward references to functions
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: undefined variable {identifier.value}', identifier.position)
 
-        self.__undefined_references.clear()
         self.__active_scope = self.__active_scope.close_scope()
 
     def visit_variable_definition(self, node: VariableDefinitionNode):
-        # visit the initializer first, as a variable cannot reference itself
-        node.initializer.accept(self)
-
-        # register symbol
-        if self.__active_scope.lookup(node.identifier.value, False) is not None:
+        # check for duplicate definition
+        symbol = self.__active_scope.lookup(node.identifier.value, False)
+        if symbol is not None:
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: duplicate definition of {node.identifier.value}', node.identifier.position)
-            return
 
-        # TODO: create declaration and symbol
+        node.initializer.accept(self)
+
+        # register symbol after vising the initializer to avoid self-references
+        if symbol is None:
+            self.__active_scope.register(node.identifier.value, node=node)
 
         node.identifier.accept(self)
 
     def visit_function_definition(self, node: 'FunctionDefinitionNode'):
-        # register declaration/symbol first, to allow recursion
-        if self.__active_scope.lookup(node.identifier.value, False) is not None:
+        # check for duplicate definition
+        symbol = self.__active_scope.lookup(node.identifier.value, False)
+        if symbol is not None:
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: duplicate definition of {node.identifier.value}', node.identifier.position)
-            return
 
-        self.__active_scope = self.__active_scope.open_scope()
+        # register symbol
+        self.__active_scope.register(node.identifier.value, node=node)
+        node.identifier.accept(self)
 
-        # visit children
+        # visit children in new boundary scope
+        self.__active_scope = self.__active_scope.open_scope(boundary=True)
         super().visit_function_definition(node)
+        self.__active_scope = self.__active_scope.close_scope()
 
     # binds symbols to identifiers, and marks undefined/yet-to-be-defined references
     def visit_identifier(self, node: IdentifierNode):

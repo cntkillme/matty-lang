@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, List, Optional, TYPE_CHECKING
+from typing import Callable, cast, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mattylang.symbols import Symbol, SymbolTable
@@ -11,7 +11,6 @@ class AbstractNode(ABC):
     def __init__(self, position: int):
         self.parent: Optional[AbstractNode] = None
         self.position = position
-        self.invalid = False
 
     @abstractmethod
     def __str__(self) -> str:
@@ -20,10 +19,6 @@ class AbstractNode(ABC):
     @abstractmethod
     def accept(self, visitor: 'AbstractVisitor') -> None:
         pass
-
-    def invalidate(self):
-        self.invalid = True
-        return self
 
     def get_first_ancestor(self, predicate: Callable[['AbstractNode'], bool]) -> Optional['AbstractNode']:
         node = self.parent
@@ -56,6 +51,7 @@ class ChunkNode(StatementNode):
         super().__init__(position)
         self.statements = statements
         self.symbol_table: Optional[SymbolTable] = None  # set by the binder
+        self.return_type: Optional['TypeNode'] = None  # set by the checker
         for statement in statements:
             statement.parent = self
 
@@ -135,7 +131,7 @@ class BreakStatementNode(StatementNode):
         visitor.visit_break_statement(self)
 
     def get_enclosing_loop_statement(self):
-        return self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode))
+        return cast(Optional[WhileStatementNode], self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode)))
 
 
 class ContinueStatementNode(StatementNode):
@@ -149,7 +145,7 @@ class ContinueStatementNode(StatementNode):
         visitor.visit_continue_statement(self)
 
     def get_enclosing_loop_statement(self):
-        return self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode))
+        return cast(Optional[WhileStatementNode], self.get_first_ancestor(lambda parent: isinstance(parent, WhileStatementNode)))
 
 
 class FunctionDefinitionNode(StatementNode):
@@ -194,7 +190,7 @@ class ReturnStatementNode(StatementNode):
         visitor.visit_return_statement(self)
 
     def get_enclosing_function_definition(self):
-        return self.get_first_ancestor(lambda parent: isinstance(parent, FunctionDefinitionNode))
+        return cast(Optional[FunctionDefinitionNode], self.get_first_ancestor(lambda parent: isinstance(parent, FunctionDefinitionNode)))
 
 
 class CallStatementNode(StatementNode):
@@ -211,7 +207,7 @@ class CallStatementNode(StatementNode):
 
 
 class ExpressionNode(AbstractNode, ABC):
-    @abstractmethod
+    @ abstractmethod
     def __init__(self, position: int = -1):
         super().__init__(position)
         self.type: Optional[TypeNode] = None  # set by the checker
@@ -367,7 +363,7 @@ class BinaryExpressionNode(ExpressionNode):
 
 
 class TypeNode(AbstractNode, ABC):
-    @abstractmethod
+    @ abstractmethod
     def is_assignable_to(self, other: 'TypeNode') -> bool:
         pass
 

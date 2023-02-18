@@ -1,6 +1,6 @@
+from mattylang.ast import *
 from mattylang.module import Module
-from mattylang.nodes import *
-from mattylang.visitor import AbstractVisitor, ScopedVisitor
+from mattylang.visitor import AbstractVisitor
 
 
 class AstPrinter(AbstractVisitor):
@@ -133,20 +133,17 @@ class AstPrinter(AbstractVisitor):
         self.__write(f'{node} <{line}, {column}>')
 
 
-class SymbolPrinter(ScopedVisitor):
+class SymbolPrinter(AbstractVisitor):
     def __init__(self, module: Module, indent: int = 0):
-        super().__init__(module)
+        super().__init__()
         self.__indent = indent
-
-    def visit_program(self, node: ProgramNode):
-        super().visit_program(node)
 
     def visit_chunk(self, node: ChunkNode):
         self.__write('{')
         self.__indent += 1
 
-        if node.symbols is not None:
-            for symbol in node.symbols.variables.values():
+        if node.symbol_table is not None:
+            for symbol in node.symbol_table.children:
                 self.__write(str(symbol))
 
         super().visit_chunk(node)

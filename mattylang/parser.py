@@ -2,15 +2,6 @@ from mattylang.ast import *
 from mattylang.lexer import Lexer
 
 
-# # Annotation that emits a diagnostic when a function is called.
-# # This is used to trace the parser's execution.
-# def trace(func: Callable):
-#     def wrapper(self, *args, **kwargs):
-#         self.module.diagnostics.emit_diagnostic('info', f'calling {func.__name__}', self.lexer.peek().position)
-#         return func(self, *args, **kwargs)
-#     return wrapper
-
-
 class Parser:
     def __init__(self, lexer: Lexer):
         self.module = lexer.module
@@ -23,7 +14,7 @@ class Parser:
 
     def parse(self) -> ProgramNode:
         if self.__program is None:
-            self.__program = self.parse_program()
+            self.__program = self.__parse_program()
             self.__expect('eof', 'to end program')
         return self.__program
 
@@ -36,10 +27,9 @@ class Parser:
         '*': 4, '/': 4, '%': 4,
     }
 
-    def parse_program(self) -> ProgramNode:
-        start = self.lexer.peek().position
-        program = ProgramNode(self.__parse_chunk(terminator='eof', start=start), position=start)
-        return program
+    def __parse_program(self) -> ProgramNode:
+        start = self.lexer.position
+        return ProgramNode(self.__parse_chunk(terminator='eof', start=start), position=start)
 
     def __parse_statement(self) -> Optional[StatementNode]:
         token = self.lexer.peek()
@@ -53,7 +43,7 @@ class Parser:
             token = self.lexer.scan()  # skip 'def'
             identifier = self.__parse_identifier()
 
-            if identifier.invalid:
+            if identifier.value == '#invalid':
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: expected identifier for definition, got {token}', token.position)
 
@@ -63,10 +53,9 @@ class Parser:
             elif token2.kind == '(':  # function definition
                 return self.__parse_function_definition(identifier, start=start)
             else:
-                # if missing '=' or '(', assume nil-initialized variable definition
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: expected = or ( for definition, got {token2}', token2.position)
-                return VariableDefinitionNode(identifier, NilLiteralNode().invalidate(), position=start)
+                return None
         elif token.kind == 'if':  # if statement
             return self.__parse_if_statement()
         elif token.kind == 'while':  # while statement
@@ -87,24 +76,23 @@ class Parser:
             if token.kind == '=':  # variable assignment
                 return self.__parse_variable_assignment(identifier)
             elif token.kind == '(':  # call statement
-                node = CallStatementNode(self.__parse_call_expression(identifier))
-                node.position = node.call_expression.position
-                return node
+                call_expression = self.__parse_call_expression(identifier)
+                return CallStatementNode(call_expression, position=call_expression.position)
             else:
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: unexpected {identifier}', identifier.position)
                 return None
         else:
-            # Try to parse an expression and assign to a temporary, to provide more meaningful diagnostics.
+            # parse expression as temporaries, to provide more meaningful diagnostics.
             expression = self.__parse_expression()
             if expression is None:
                 self.module.diagnostics.emit_diagnostic(
-                    'error', f'syntax: expected statement (got {token})', token.position)
+                    'error', f'syntax: expected statement, got {token}', token.position)
                 self.lexer.scan()  # skip non-statement/expression token
             else:
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: unexpected {expression}', expression.position)
-                return VariableDefinitionNode(IdentifierNode('#invalid').invalidate(), expression).invalidate()
+                return VariableDefinitionNode(IdentifierNode('#invalid'), expression)
 
     def __parse_chunk(self, terminator: str, start: int):
         statements: List[StatementNode] = []
@@ -120,26 +108,26 @@ class Parser:
 
     def __parse_variable_definition(self, identifier: IdentifierNode, start: int):
         self.lexer.scan()  # skip '='
-        initializer = self.__expect_expression_or(f'to initialize variable {identifier.value}', NilLiteralNode())
+        initializer = self.__expect_expression(f'to initialize variable {identifier.value}') or NilLiteralNode()
         return VariableDefinitionNode(identifier, initializer, position=start)
 
     def __parse_variable_assignment(self, identifier: IdentifierNode):
         self.lexer.scan()  # skip '='
-        initializer = self.__expect_expression_or(f'to assign variable {identifier.value}', NilLiteralNode())
+        initializer = self.__expect_expression(f'to assign variable {identifier.value}') or NilLiteralNode()
         return VariableAssignmentNode(identifier, initializer, position=identifier.position)
 
     def __parse_if_statement(self):
         start = self.lexer.peek().position
         self.lexer.scan()  # skip 'if'
         self.__expect('(', 'to open if condition')
-        if_condition = self.__expect_expression_or('after (', BoolLiteralNode(False))
+        if_condition = self.__expect_expression('after (') or BoolLiteralNode(False)
         self.__expect(')', 'to close if condition')
-        if_body = self.__expect_statement_or('after )', ChunkNode())
+        if_body = self.__expect_statement('after )') or ChunkNode()
         else_body = None
 
         if self.lexer.peek().kind == 'else':
             self.lexer.scan()
-            else_body = self.__expect_statement_or('after else', ChunkNode())
+            else_body = self.__expect_statement('after else') or ChunkNode()
 
         # transform non-chunk statement into chunk
         if not isinstance(if_body, ChunkNode):
@@ -154,9 +142,9 @@ class Parser:
     def __parse_while_statement(self):
         start = self.lexer.peek().position
         self.__expect('(', 'to open while condition')
-        condition = self.__expect_expression_or('after while', BoolLiteralNode(False))
+        condition = self.__expect_expression('after while') or BoolLiteralNode(False)
         self.__expect(')', 'to close while condition')
-        body = self.__expect_statement_or('after while', ChunkNode())
+        body = self.__expect_statement('after while') or ChunkNode()
 
         # transform non-chunk statement chunk
         if not isinstance(body, ChunkNode):
@@ -172,7 +160,6 @@ class Parser:
         position = self.lexer.peek().position
         if self.__expect('{', 'to open function body'):
             body = self.__parse_chunk(terminator='}', start=position)
-            body.position = position
             self.__expect('}', 'to close function body')
         else:
             body = ChunkNode()
@@ -181,7 +168,7 @@ class Parser:
 
     def __parse_function_parameter(self, identifier: IdentifierNode):
         self.__expect(':', 'to specify parameter type')
-        type = self.__expect_type_or('to specify parameter type', AnyTypeNode())
+        type = self.__expect_type('to specify parameter type') or AnyTypeNode()
         return FunctionParameterNode(identifier, type, position=identifier.position)
 
     def __parse_parameter_list(self):
@@ -191,7 +178,7 @@ class Parser:
         while token.kind != ')' and token.kind != 'eof':
             identifier = self.__parse_identifier()
 
-            if not identifier.invalid:
+            if identifier.value != '#invalid;':
                 parameters.append(self.__parse_function_parameter(identifier))
                 token = self.lexer.peek()
 
@@ -219,18 +206,23 @@ class Parser:
             return expression
 
         if token.kind == 'nil':
+            self.lexer.scan()
             return NilLiteralNode(position=token.position)
         elif token.kind == 'true':
+            self.lexer.scan()
             return BoolLiteralNode(True, position=token.position)
         elif token.kind == 'false':
+            self.lexer.scan()
             return BoolLiteralNode(False, position=token.position)
         elif token.kind == 'real_literal':
+            self.lexer.scan()
             try:
                 # lexer invariant: token.lexeme is a valid float
                 return RealLiteralNode(float(token.lexeme), position=token.position)
             except ValueError:
                 assert False, f'invalid real literal {token.lexeme}'
         elif token.kind == 'string_literal':
+            self.lexer.scan()
             return StringLiteralNode(token.lexeme, position=token.position)
         elif token.kind == 'identifier':  # identifier or function call
             identifier = self.__parse_identifier()
@@ -249,7 +241,7 @@ class Parser:
             self.lexer.scan()
             return node
         else:
-            return IdentifierNode('#error', position=token.position).invalidate()
+            return IdentifierNode('#error', position=token.position)
 
     def __parse_call_expression(self, identifier: IdentifierNode) -> CallExpressionNode:
         self.__expect('(', 'to open function arguments')
@@ -332,7 +324,7 @@ class Parser:
         parameter_types = self.__parse_type_list()
         self.__expect(')', 'to close function type')
         self.__expect('->', 'to specify return type')
-        return_type = self.__expect_type_or('after ->', AnyTypeNode())
+        return_type = self.__expect_type('after ->') or AnyTypeNode()
         node = FunctionTypeNode(parameter_types, return_type)
         node.position = position
         return node
@@ -390,13 +382,6 @@ class Parser:
                 'error', f'syntax: expected type (got {type_token}) {context}', type_token.position)
         return type
 
-    def __expect_type_or(self, context: str, default: TypeNode) -> TypeNode:
-        type = self.__expect_type(context)
-        if type is None:
-            type = default
-            type.invalidate()
-        return type
-
     def __expect_statement(self, context: str) -> Optional[StatementNode]:
         stmt_token = self.lexer.peek()
         stmt = self.__parse_statement()
@@ -405,24 +390,10 @@ class Parser:
                 'error', f'syntax: expected statement (got {stmt_token}) {context}', stmt_token.position)
         return stmt
 
-    def __expect_statement_or(self, context: str, default: StatementNode) -> StatementNode:
-        stmt = self.__expect_statement(context)
-        if stmt is None:
-            stmt = default
-            stmt.invalidate()
-        return stmt
-
     def __expect_expression(self, context: str) -> Optional[ExpressionNode]:
         expr_token = self.lexer.peek()
         expr = self.__parse_expression()
         if expr is None:
             self.module.diagnostics.emit_diagnostic(
                 'error', f'syntax: expected expression (got {expr_token}) {context}', expr_token.position)
-        return expr
-
-    def __expect_expression_or(self, context: str, default: ExpressionNode) -> ExpressionNode:
-        expr = self.__expect_expression(context)
-        if expr is None:
-            expr = default
-            expr.invalidate()
         return expr

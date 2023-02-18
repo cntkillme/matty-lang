@@ -1,4 +1,5 @@
-from mattylang.nodes import *
+from mattylang.ast import *
+from mattylang.module import Module
 from mattylang.visitor import AbstractVisitor
 
 
@@ -9,7 +10,7 @@ class PythonSafeVariableRenamer(AbstractVisitor):
         super().__init__()
         self.module = module
 
-    def visit_variable_declaration(self, node: VariableDeclarationNode):
+    def visit_variable_definition(self, node: VariableDefinitionNode):
         symbol = node.identifier.get_symbol()
         name = symbol.name
         new_name = name
@@ -38,7 +39,9 @@ class PythonSafeVariableRenamer(AbstractVisitor):
             'info', f'emitter: renamed variable {name} to {new_name}', node.identifier.position)
 
         # visit children
-        super().visit_variable_declaration(node)
+        super().visit_variable_definition(node)
+
+    # TODO: functions
 
 
 class Emitter(AbstractVisitor):
@@ -49,7 +52,6 @@ class Emitter(AbstractVisitor):
         self.__statement: str = ''
         self.__depth: int = 0
 
-        #
         # TODO: Rename variables to avoid collisions with Python keywords.
 
     def __str__(self):
@@ -57,42 +59,6 @@ class Emitter(AbstractVisitor):
 
     def __write_line(self, stmt: str):
         self.__lines.append(('    ' * self.__depth) + stmt)
-
-    def visit_program(self, node: ProgramNode):
-        super().visit_program(node)
-
-    def visit_chunk(self, node: ChunkNode):
-        # Since Python does not have proper lexical scoping, variables must be renamed to avoid collisions.
-        for statement in node.statements:
-            if isinstance(statement, VariableDeclarationNode):
-                symbol = statement.identifier.get_symbol()
-                name = symbol.name
-                new_name = name
-
-                # generate a new variable name if the current name was previously used
-                if symbol.scope.parent is not None:
-                    i = 1
-                    while symbol.scope.parent.lookup(new_name, True) is not None:
-                        new_name = f'{name}_{i}'
-                        i += 1
-
-                # skip renaming if name is not previously used
-                if name == new_name:
-                    continue
-
-                # rename the variable references
-                for identifier in symbol.references:
-                    identifier.value = new_name
-
-                # rename the variable in the symbol table
-                del symbol.scope.variables[name]
-                symbol.scope.variables[new_name] = symbol
-                symbol.name = new_name
-
-                self.module.diagnostics.emit_diagnostic(
-                    'info', f'emitter: renamed variable {name} to {new_name}', statement.identifier.position)
-
-        super().visit_chunk(node)
 
     def visit_variable_definition(self, node: VariableDefinitionNode):
         self.__statement = f'{node.identifier.value} = '
