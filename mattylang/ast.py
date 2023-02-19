@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Callable, cast, List, Optional, TYPE_CHECKING
+from typing import Callable, cast, List, Optional, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from mattylang.symbols import Symbol, SymbolTable
     from mattylang.visitor import AbstractVisitor
+
+T = TypeVar('T', bound='AbstractNode')
 
 
 class AbstractNode(ABC):
@@ -50,8 +52,9 @@ class ChunkNode(StatementNode):
     def __init__(self, statements: List[StatementNode] = [], position: int = -1):
         super().__init__(position)
         self.statements = statements
-        self.symbol_table: Optional[SymbolTable] = None  # set by the binder
-        self.return_type: Optional['TypeNode'] = None  # set by the checker
+        self.scope: Optional[SymbolTable] = None  # set by the binder
+        self.parent_chunk: Optional[ChunkNode] = None  # set by the binder, not set at function scope
+        self.return_type: Optional[TypeNode] = None  # set by the checker
         for statement in statements:
             statement.parent = self
 
@@ -61,9 +64,9 @@ class ChunkNode(StatementNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_chunk(self)
 
-    def get_symbol_table(self) -> 'SymbolTable':
-        assert self.symbol_table is not None, f'fatal: symbol table for {self} not set, was the binder run?'
-        return self.symbol_table
+    def get_scope(self) -> 'SymbolTable':
+        assert self.scope is not None, f'fatal: symbol table for {self} not set, was the binder run?'
+        return self.scope
 
 
 class VariableDefinitionNode(StatementNode):
@@ -162,6 +165,11 @@ class FunctionDefinitionNode(StatementNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_function_definition(self)
 
+    def get_type(self) -> 'FunctionTypeNode':
+        type = self.identifier.get_symbol().get_type()
+        assert isinstance(type, FunctionTypeNode), f'fatal: type of {self.identifier} is not a function type'
+        return type
+
 
 class FunctionParameterNode(AbstractNode):
     def __init__(self, identifier: 'IdentifierNode', type: 'TypeNode', position: int = -1):
@@ -207,7 +215,7 @@ class CallStatementNode(StatementNode):
 
 
 class ExpressionNode(AbstractNode, ABC):
-    @ abstractmethod
+    @abstractmethod
     def __init__(self, position: int = -1):
         super().__init__(position)
         self.type: Optional[TypeNode] = None  # set by the checker
@@ -305,7 +313,6 @@ class CallExpressionNode(PrimaryExpressionNode):
     def __init__(self, identifier: IdentifierNode, arguments: List[ExpressionNode], position: int = -1):
         super().__init__(position)
         self.identifier, self.arguments = identifier, arguments
-        self.symbol: Optional[Symbol] = None  # set by the binder
         self.type: Optional[FunctionTypeNode] = None  # set by the checker
         identifier.parent = self
         for argument in arguments:
@@ -318,11 +325,9 @@ class CallExpressionNode(PrimaryExpressionNode):
         visitor.visit_call_expression(self)
 
     def get_type(self) -> 'TypeNode':
-        return self.get_symbol().get_type()
-
-    def get_symbol(self) -> 'Symbol':
-        assert self.symbol is not None,  f'fatal: symbol not set for {self}, was the binder run?'
-        return self.symbol
+        type = self.identifier.get_symbol().get_type()
+        assert isinstance(type, FunctionTypeNode), f'fatal: type of {self.identifier} is not a function type'
+        return type.return_type
 
 
 class UnaryExpressionNode(ExpressionNode):
@@ -363,12 +368,38 @@ class BinaryExpressionNode(ExpressionNode):
 
 
 class TypeNode(AbstractNode, ABC):
-    @ abstractmethod
+    @abstractmethod
     def is_assignable_to(self, other: 'TypeNode') -> bool:
         pass
 
     def is_equivalent(self, other: 'TypeNode') -> bool:
         return self.is_assignable_to(other) and other.is_assignable_to(self)
+
+
+class FreeTypeNode(TypeNode):
+    next_free_id = 0
+
+    def __init__(self, id: Optional[int] = None, position: int = -1):
+        super().__init__(position)
+        self.id = id or FreeTypeNode.next_free_id
+        self.types: List[TypeNode] = []
+        if id is None:
+            FreeTypeNode.next_free_id += 1
+
+    def __str__(self) -> str:
+        return f'Free{self.id}'
+
+    def accept(self, visitor: 'AbstractVisitor') -> None:
+        assert False, 'fatal: free type should not be visited'
+
+    def is_assignable_to(self, other: TypeNode):
+        return isinstance(other, AnyTypeNode) or (isinstance(other, FreeTypeNode) and other.id == self.id)
+
+    def merge(self) -> Optional[TypeNode]:
+        if len(self.types) == 1:
+            return self.types[0]
+        else:
+            return None
 
 
 class AnyTypeNode(TypeNode):

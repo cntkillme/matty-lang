@@ -68,6 +68,18 @@ class Checker(AbstractVisitor):
     def visit_function_definition(self, node: FunctionDefinitionNode):
         super().visit_function_definition(node)  # visit children
 
+        if node.identifier.symbol is None:
+            return
+
+        # TODO: control flow analysis, ensure all paths lead to a return statement
+
+        # type inference: return type of function = return type of body
+        if node.body.return_type is None:
+            node.body.return_type = NilTypeNode()
+
+        parameter_types = [parameter.type for parameter in node.parameters]
+        node.identifier.symbol.type = FunctionTypeNode(parameter_types, node.body.return_type)
+
     def visit_function_parameter(self, node: FunctionParameterNode):
         super().visit_function_parameter(node)  # visit children
 
@@ -90,30 +102,38 @@ class Checker(AbstractVisitor):
         elif chunk_type is None:
             enclosing_function.body.return_type = return_type
 
+    def visit_call_statement(self, node: 'CallStatementNode'):
+        super().visit_call_statement(node)
+        if node.call_expression.type and not node.call_expression.type.is_assignable_to(NilTypeNode()):
+            self.module.diagnostics.emit_diagnostic(
+                'warning', f'analysis: return value discarded', node.position)
+
     def visit_nil_literal(self, node: NilLiteralNode):
-        node.type = NilTypeNode()
+        node.type = NilTypeNode(position=node.position)
 
     def visit_bool_literal(self, node: BoolLiteralNode):
-        node.type = BoolTypeNode()
+        node.type = BoolTypeNode(position=node.position)
 
     def visit_real_literal(self, node: RealLiteralNode):
-        node.type = RealTypeNode()
+        node.type = RealTypeNode(position=node.position)
 
     def visit_string_literal(self, node: StringLiteralNode):
-        node.type = StringTypeNode()
+        node.type = StringTypeNode(position=node.position)
 
     def visit_identifier(self, node: IdentifierNode):
         if node.symbol is not None:
             node.type = node.symbol.type
 
     def visit_call_expression(self, node: CallExpressionNode):
-        parameter_types: List[TypeNode] = []
-        for argument in node.arguments:
-            argument.accept(self)
-            parameter_types.append(argument.type or AnyTypeNode())
-        #
+        super().visit_call_expression(node)  # visit children
+        symbol = node.identifier.symbol
 
-        return super().visit_call_expression(node)  # visit children
+        if symbol is None:
+            return
+
+        parameter_types: List[TypeNode] = [argument.type or AnyTypeNode(
+            position=argument.position) for argument in node.arguments]
+        return_type = symbol.type or FreeTypeNode(position=node.position)
 
     def visit_unary_expression(self, node: UnaryExpressionNode):
         super().visit_unary_expression(node)  # visit children
@@ -176,3 +196,44 @@ class Checker(AbstractVisitor):
             return
 
         node.type = result_type
+
+
+"""
+    Type inference for the return type of a function. The process is as follows:
+    1. Check and merge the types of all return statements
+    2. If the function body has a return statement, the return type of the function is the type of the return statement.
+    3. If the function body does not have a return statement, the return type of the function is nil.
+    4. For all
+"""
+
+
+class ReturnTypeInference(AbstractVisitor):
+    def __init__(self, module: Module):
+        self.module = module
+
+    def visit_chunk(self, node: ChunkNode):
+        super().visit_chunk(node)  # visit children
+        parent = node.parent_chunk
+
+        # case 1: chunk is a function body
+        if parent is None:
+            # functions that do not return anything will return nil
+            node.return_type = node.return_type or NilTypeNode()
+            return
+
+        # case 2: merge return type with parent
+        if node.return_type is not None:
+            if parent.return_type is None:
+                parent.return_type = node.return_type
+            elif not node.return_type.is_assignable_to(parent.return_type):
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'analysis: incompatible return type of {node.return_type} to {parent.return_type}', node.return_type.position)
+                return
+
+        # Merge chunks' return type with their parent
+
+    def visit_function_definition(self, node: FunctionDefinitionNode):
+        node.body.accept(self)  # visit children
+
+        if node.identifier.symbol is None:
+            return

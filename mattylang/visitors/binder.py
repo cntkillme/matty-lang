@@ -8,19 +8,25 @@ class Binder(AbstractVisitor):
     def __init__(self, module: Module):
         self.module = module
         self.__active_scope = module.globals
+        self.__parent_chunk: Optional[ChunkNode] = None
         self.__undefined_references: dict[IdentifierNode, SymbolTable] = {}
 
     def visit_chunk(self, node: ChunkNode):
-        assert node.symbol_table is None, f'fatal: {node} already has symbol table: {node.symbol_table}'
+        assert node.scope is None, f'fatal: {node} already has symbol table: {node.scope}'
+        node.parent_chunk = self.__parent_chunk
+        self.__parent_chunk = node
         self.__active_scope = self.__active_scope.open_scope()
-        node.symbol_table = self.__active_scope
+        node.scope = self.__active_scope
         super().visit_chunk(node)  # visit children
 
         # handle undefined references
         for identifier in self.__undefined_references:
-            self.module.diagnostics.emit_diagnostic(
-                'error', f'analysis: undefined variable {identifier.value}', identifier.position)
+            if identifier.symbol is None:
+                self.module.diagnostics.emit_diagnostic(
+                    'error', f'analysis: undefined reference {identifier.value}', identifier.position)
 
+        self.__undefined_references.clear()
+        self.__parent_chunk = node.parent_chunk
         self.__active_scope = self.__active_scope.close_scope()
 
     def visit_variable_definition(self, node: VariableDefinitionNode):
@@ -32,11 +38,10 @@ class Binder(AbstractVisitor):
 
         node.initializer.accept(self)
 
-        # register symbol after vising the initializer to avoid self-references
+        # register symbol after vising the initializer
         if symbol is None:
             self.__active_scope.register(node.identifier.value, node=node)
-
-        node.identifier.accept(self)
+            node.identifier.accept(self)
 
     def visit_function_definition(self, node: 'FunctionDefinitionNode'):
         # check for duplicate definition
@@ -51,8 +56,13 @@ class Binder(AbstractVisitor):
 
         # visit children in new boundary scope
         self.__active_scope = self.__active_scope.open_scope(boundary=True)
-        super().visit_function_definition(node)
+        for parameter in node.parameters:
+            parameter.accept(self)
+        node.body.accept(self)
         self.__active_scope = self.__active_scope.close_scope()
+
+        # unset function body's parent chunk
+        node.body.parent_chunk = None
 
     # binds symbols to identifiers, and marks undefined/yet-to-be-defined references
     def visit_identifier(self, node: IdentifierNode):

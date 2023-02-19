@@ -15,7 +15,9 @@
 	- Documentation	Improvements
 	- Tests
 - Future Plans (subject to change)
-	- Closures and lexically-scoped variables, Lambdas
+	- MattyLang runtime
+	- Variable and function declarations
+	- Closures, lambdas
 	- Real literal expansion (scientific notation)
 	- String literal expansion (string escape sequences, string interpolation)
 	- Integer type and literals

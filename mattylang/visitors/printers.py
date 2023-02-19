@@ -138,6 +138,12 @@ class AstPrinter(AbstractVisitor):
         line, column = self.module.line_map.get_location(node.position)
         self.__write(f'{node} <{line}, {column}>')
 
+        if isinstance(node, IdentifierNode):
+            self.__write(f'- symbol: {node.symbol}')
+
+        if isinstance(node, ExpressionNode):
+            self.__write(f'- type: {node.type}')
+
 
 class SymbolPrinter(AbstractVisitor):
     def __init__(self, module: Module, indent: int = 0):
@@ -148,8 +154,8 @@ class SymbolPrinter(AbstractVisitor):
         self.__write('{')
         self.__indent += 1
 
-        if node.symbol_table is not None:
-            for symbol in node.symbol_table.variables:
+        if node.scope is not None:
+            for symbol in node.scope.variables:
                 self.__write(str(symbol))
 
         super().visit_chunk(node)
