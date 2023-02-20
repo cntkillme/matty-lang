@@ -49,7 +49,7 @@ class Lexer:
     __keyword_set = {'def', 'nil', 'true', 'false', 'if', 'else', 'while',
                      'break', 'continue', 'return', 'Nil', 'Bool', 'Real', 'String'}
     __punctuation = {'(', ')', '{', '}', '=', '!', '+', '-', '*', '/',
-                     '%', '<', '>', '==', '!=', '<=', '>=', '||', '&&', ':', '->'}
+                     '%', '<', '>', '==', '!=', '<=', '>=', '||', '&&', ':', '->', ','}
 
     def __scan_impl(self) -> Token:
         chr = self.__get_char()

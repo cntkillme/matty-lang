@@ -148,19 +148,31 @@ class AstPrinter(AbstractVisitor):
 class SymbolPrinter(AbstractVisitor):
     def __init__(self, module: Module, indent: int = 0):
         super().__init__()
+        self.module = module
         self.__indent = indent
 
-    def visit_chunk(self, node: ChunkNode):
-        self.__write('{')
-        self.__indent += 1
+        # write global symbols first
+        for symbol in module.globals.variables.values():
+            self.__write(str(symbol))
 
-        if node.scope is not None:
-            for symbol in node.scope.variables:
+    def visit_chunk(self, node: ChunkNode):
+        if isinstance(node.parent, FunctionDefinitionNode):
+            self.__write('{')
+
+        self.__indent += 1
+        assert node.scope is not None, 'fatal: chunk node has no scope, was the binder run?'
+
+        for symbol in node.scope.variables.values():
+            if symbol.node:
+                line, column = self.module.line_map.get_location(symbol.node.position)
+                self.__write(f'{str(symbol)} <{line}, {column}>')
+            else:
                 self.__write(str(symbol))
 
         super().visit_chunk(node)
         self.__indent -= 1
-        self.__write('}')
+        if isinstance(node.parent, FunctionDefinitionNode):
+            self.__write('}')
 
     def __write(self, text: str):
         print('  ' * self.__indent + text)

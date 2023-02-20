@@ -143,6 +143,7 @@ class Parser:
 
     def __parse_while_statement(self):
         start = self.lexer.peek().position
+        self.lexer.scan()  # skip 'while'
         self.__expect('(', 'to open while condition')
         condition = self.__expect_expression('after while') or BoolLiteralNode(self.lexer.peek().position, False)
         self.__expect(')', 'to close while condition')

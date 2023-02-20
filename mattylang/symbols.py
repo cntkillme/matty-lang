@@ -18,7 +18,7 @@ class Symbol:
         self.type = type  # set by checker
 
     def __str__(self):
-        return f'symbol(name: {self.name}, node: {self.node}, type: {self.type})'
+        return f'symbol(name: {self.name}, node: {self.node}, type: {self.type}, extern: {self.extern})'
 
     def get_node(self) -> 'AbstractNode':
         assert self.node is not None, 'node is not set for {self}, was the binder run?'
