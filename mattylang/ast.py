@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Callable, cast, List, Optional, TYPE_CHECKING, TypeVar
+from typing import Callable, cast, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mattylang.symbols import Symbol, SymbolTable
     from mattylang.visitor import AbstractVisitor
-
-T = TypeVar('T', bound='AbstractNode')
 
 
 class AbstractNode(ABC):
@@ -30,9 +28,12 @@ class AbstractNode(ABC):
             node = node.parent
         return None
 
+    def get_enclosing_function(self) -> Optional['FunctionDefinitionNode']:
+        return cast(Optional[FunctionDefinitionNode], self.get_first_ancestor(lambda node: isinstance(node, FunctionDefinitionNode)))
+
 
 class ProgramNode(AbstractNode):
-    def __init__(self, chunk: 'ChunkNode', position: int = -1):
+    def __init__(self, position: int, chunk: 'ChunkNode'):
         super().__init__(position)
         self.chunk = chunk
         chunk.parent = self
@@ -49,7 +50,7 @@ class StatementNode(AbstractNode, ABC):
 
 
 class ChunkNode(StatementNode):
-    def __init__(self, statements: List[StatementNode] = [], position: int = -1):
+    def __init__(self, position: int, statements: List[StatementNode] = []):
         super().__init__(position)
         self.statements = statements
         self.scope: Optional[SymbolTable] = None  # set by the binder
@@ -70,7 +71,7 @@ class ChunkNode(StatementNode):
 
 
 class VariableDefinitionNode(StatementNode):
-    def __init__(self, identifier: 'IdentifierNode', initializer: 'ExpressionNode', position: int = -1):
+    def __init__(self, position: int, identifier: 'IdentifierNode', initializer: 'ExpressionNode'):
         super().__init__(position)
         self.identifier, self.initializer = identifier, initializer
         identifier.parent, initializer.parent = self, self
@@ -83,7 +84,7 @@ class VariableDefinitionNode(StatementNode):
 
 
 class VariableAssignmentNode(StatementNode):
-    def __init__(self, identifier: 'IdentifierNode', value: 'ExpressionNode', position: int = -1):
+    def __init__(self, position: int, identifier: 'IdentifierNode', value: 'ExpressionNode'):
         super().__init__(position)
         self.identifier, self.value = identifier, value
         identifier.parent, value.parent = self, self
@@ -96,7 +97,7 @@ class VariableAssignmentNode(StatementNode):
 
 
 class IfStatementNode(StatementNode):
-    def __init__(self, condition: 'ExpressionNode', if_body: ChunkNode, else_body: Optional[ChunkNode] = None, position: int = -1):
+    def __init__(self, position: int, condition: 'ExpressionNode', if_body: ChunkNode, else_body: Optional[ChunkNode] = None):
         super().__init__(position)
         self.condition, self.if_body, self.else_body = condition, if_body, else_body
         if_body.parent = self
@@ -111,7 +112,7 @@ class IfStatementNode(StatementNode):
 
 
 class WhileStatementNode(StatementNode):
-    def __init__(self, condition: 'ExpressionNode', body: ChunkNode, position: int = -1):
+    def __init__(self, position: int, condition: 'ExpressionNode', body: ChunkNode):
         super().__init__(position)
         self.condition, self.body = condition, body
         condition.parent, body.parent = self, self
@@ -124,7 +125,7 @@ class WhileStatementNode(StatementNode):
 
 
 class BreakStatementNode(StatementNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self):
@@ -138,7 +139,7 @@ class BreakStatementNode(StatementNode):
 
 
 class ContinueStatementNode(StatementNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self):
@@ -152,7 +153,7 @@ class ContinueStatementNode(StatementNode):
 
 
 class FunctionDefinitionNode(StatementNode):
-    def __init__(self, identifier: 'IdentifierNode', parameters: List['FunctionParameterNode'], body: ChunkNode, position: int = -1):
+    def __init__(self, position: int, identifier: 'IdentifierNode', parameters: List['FunctionParameterNode'], body: ChunkNode):
         super().__init__(position)
         self.identifier, self.parameters, self.body = identifier, parameters, body
         identifier.parent, body.parent = self, self
@@ -165,27 +166,22 @@ class FunctionDefinitionNode(StatementNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_function_definition(self)
 
-    def get_type(self) -> 'FunctionTypeNode':
-        type = self.identifier.get_symbol().get_type()
-        assert isinstance(type, FunctionTypeNode), f'fatal: type of {self.identifier} is not a function type'
-        return type
-
 
 class FunctionParameterNode(AbstractNode):
-    def __init__(self, identifier: 'IdentifierNode', type: 'TypeNode', position: int = -1):
+    def __init__(self, position: int, identifier: 'IdentifierNode', type: 'TypeNode'):
         super().__init__(position)
         self.identifier, self.type = identifier, type
         identifier.parent, type.parent = self, self
 
     def __str__(self):
-        return f'variable_declaration'
+        return f'function_parameter'
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_function_parameter(self)
 
 
 class ReturnStatementNode(StatementNode):
-    def __init__(self, value: Optional['ExpressionNode'] = None, position: int = -1):
+    def __init__(self, position: int, value: Optional['ExpressionNode'] = None):
         super().__init__(position)
         self.value = value
         if value is not None:
@@ -202,7 +198,7 @@ class ReturnStatementNode(StatementNode):
 
 
 class CallStatementNode(StatementNode):
-    def __init__(self, call_expression: 'CallExpressionNode', position: int = -1):
+    def __init__(self, position: int, call_expression: 'CallExpressionNode'):
         super().__init__(position)
         self.call_expression = call_expression
         call_expression.parent = self
@@ -216,7 +212,7 @@ class CallStatementNode(StatementNode):
 
 class ExpressionNode(AbstractNode, ABC):
     @abstractmethod
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
         self.type: Optional[TypeNode] = None  # set by the checker
 
@@ -230,7 +226,7 @@ class PrimaryExpressionNode(ExpressionNode, ABC):
 
 
 class NilLiteralNode(PrimaryExpressionNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
         self.value = None
 
@@ -240,12 +236,9 @@ class NilLiteralNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_nil_literal(self)
 
-    def get_type(self) -> 'NilTypeNode':
-        return NilTypeNode()
-
 
 class BoolLiteralNode(PrimaryExpressionNode):
-    def __init__(self, value: bool, position: int = -1):
+    def __init__(self, position: int, value: bool):
         super().__init__(position)
         self.value = value
 
@@ -255,12 +248,9 @@ class BoolLiteralNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_bool_literal(self)
 
-    def get_type(self) -> 'BoolTypeNode':
-        return BoolTypeNode()
-
 
 class RealLiteralNode(PrimaryExpressionNode):
-    def __init__(self, value: float, position: int = -1):
+    def __init__(self, position: int, value: float):
         super().__init__(position)
         self.value = value
 
@@ -270,12 +260,9 @@ class RealLiteralNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_real_literal(self)
 
-    def get_type(self) -> 'RealTypeNode':
-        return RealTypeNode()
-
 
 class StringLiteralNode(PrimaryExpressionNode):
-    def __init__(self, value: str, position: int = -1):
+    def __init__(self, position: int, value: str):
         super().__init__(position)
         self.value = value
 
@@ -285,12 +272,9 @@ class StringLiteralNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_string_literal(self)
 
-    def get_type(self) -> 'StringTypeNode':
-        return StringTypeNode()
-
 
 class IdentifierNode(PrimaryExpressionNode):
-    def __init__(self, value: str, position: int = -1):
+    def __init__(self, position: int, value: str):
         super().__init__(position)
         self.value = value
         self.symbol: Optional['Symbol'] = None  # set by the binder
@@ -301,19 +285,15 @@ class IdentifierNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_identifier(self)
 
-    def get_type(self) -> 'TypeNode':
-        return self.get_symbol().get_type()
-
     def get_symbol(self) -> 'Symbol':
         assert self.symbol is not None, f'fatal: symbol not set for {self}, was the binder run?'
         return self.symbol
 
 
 class CallExpressionNode(PrimaryExpressionNode):
-    def __init__(self, identifier: IdentifierNode, arguments: List[ExpressionNode], position: int = -1):
+    def __init__(self, position: int, identifier: IdentifierNode, arguments: List[ExpressionNode]):
         super().__init__(position)
         self.identifier, self.arguments = identifier, arguments
-        self.type: Optional[FunctionTypeNode] = None  # set by the checker
         identifier.parent = self
         for argument in arguments:
             argument.parent = self
@@ -324,14 +304,9 @@ class CallExpressionNode(PrimaryExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_call_expression(self)
 
-    def get_type(self) -> 'TypeNode':
-        type = self.identifier.get_symbol().get_type()
-        assert isinstance(type, FunctionTypeNode), f'fatal: type of {self.identifier} is not a function type'
-        return type.return_type
-
 
 class UnaryExpressionNode(ExpressionNode):
-    def __init__(self, operator: str, operand: ExpressionNode, position: int = -1):
+    def __init__(self, position: int, operator: str, operand: ExpressionNode):
         super().__init__(position)
         self.operator, self.operand = operator, operand
         operand.parent = self
@@ -342,12 +317,9 @@ class UnaryExpressionNode(ExpressionNode):
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_unary_expression(self)
 
-    def get_type(self) -> 'TypeNode':
-        return self.operand.get_type()
-
 
 class BinaryExpressionNode(ExpressionNode):
-    def __init__(self, operator: str, left: ExpressionNode, right: ExpressionNode, position: int = -1):
+    def __init__(self, position: int, operator: str, left: ExpressionNode, right: ExpressionNode):
         super().__init__(position)
         self.operator, self.left, self.right = operator, left, right
         left.parent, right.parent = self, self
@@ -357,14 +329,6 @@ class BinaryExpressionNode(ExpressionNode):
 
     def accept(self, visitor: 'AbstractVisitor'):
         visitor.visit_binary_expression(self)
-
-    def get_type(self) -> 'TypeNode':
-        if self.operator in ('+', '-', '*', '/', '%'):
-            return self.left.get_type()
-        elif self.operator in ('==', '!=', '<', '<=', '>', '>=', '||', '&&'):
-            return BoolTypeNode()
-        else:
-            assert False, f'fatal: unknown binary operator {self.operator}'
 
 
 class TypeNode(AbstractNode, ABC):
@@ -376,34 +340,34 @@ class TypeNode(AbstractNode, ABC):
         return self.is_assignable_to(other) and other.is_assignable_to(self)
 
 
-class FreeTypeNode(TypeNode):
-    next_free_id = 0
+# class FreeTypeNode(TypeNode):
+#     next_free_id = 0
 
-    def __init__(self, id: Optional[int] = None, position: int = -1):
-        super().__init__(position)
-        self.id = id or FreeTypeNode.next_free_id
-        self.types: List[TypeNode] = []
-        if id is None:
-            FreeTypeNode.next_free_id += 1
+#     def __init__(self, position: int, id: Optional[int] = None):
+#         super().__init__(position)
+#         self.id = id or FreeTypeNode.next_free_id
+#         self.types: List[TypeNode] = []
+#         if id is None:
+#             FreeTypeNode.next_free_id += 1
 
-    def __str__(self) -> str:
-        return f'Free{self.id}'
+#     def __str__(self) -> str:
+#         return f'Free{self.id}'
 
-    def accept(self, visitor: 'AbstractVisitor') -> None:
-        assert False, 'fatal: free type should not be visited'
+#     def accept(self, visitor: 'AbstractVisitor') -> None:
+#         assert False, 'fatal: free type should not be visited'
 
-    def is_assignable_to(self, other: TypeNode):
-        return isinstance(other, AnyTypeNode) or (isinstance(other, FreeTypeNode) and other.id == self.id)
+#     def is_assignable_to(self, other: TypeNode):
+#         return isinstance(other, AnyTypeNode) or (isinstance(other, FreeTypeNode) and other.id == self.id)
 
-    def merge(self) -> Optional[TypeNode]:
-        if len(self.types) == 1:
-            return self.types[0]
-        else:
-            return None
+#     def merge(self) -> Optional[TypeNode]:
+#         if len(self.types) == 1:
+#             return self.types[0]
+#         else:
+#             return None
 
 
 class AnyTypeNode(TypeNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self) -> str:
@@ -422,7 +386,7 @@ class PrimitiveTypeNode(TypeNode, ABC):
 
 
 class NilTypeNode(PrimitiveTypeNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self) -> str:
@@ -433,7 +397,7 @@ class NilTypeNode(PrimitiveTypeNode):
 
 
 class BoolTypeNode(PrimitiveTypeNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self) -> str:
@@ -444,7 +408,7 @@ class BoolTypeNode(PrimitiveTypeNode):
 
 
 class RealTypeNode(PrimitiveTypeNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self) -> str:
@@ -455,7 +419,7 @@ class RealTypeNode(PrimitiveTypeNode):
 
 
 class StringTypeNode(PrimitiveTypeNode):
-    def __init__(self, position: int = -1):
+    def __init__(self, position: int):
         super().__init__(position)
 
     def __str__(self) -> str:
@@ -466,7 +430,7 @@ class StringTypeNode(PrimitiveTypeNode):
 
 
 class FunctionTypeNode(TypeNode):
-    def __init__(self, parameter_types: List[TypeNode], return_type: TypeNode, position: int = -1):
+    def __init__(self, position: int, parameter_types: List[TypeNode], return_type: TypeNode):
         super().__init__(position)
         self.parameter_types, self.return_type = parameter_types, return_type
 
@@ -477,7 +441,6 @@ class FunctionTypeNode(TypeNode):
         visitor.visit_function_type(self)
 
     def is_assignable_to(self, other: TypeNode) -> bool:
-        # MattyLang v1.0 does not support sub-typing, so the function signatures must be identical.
         if not isinstance(other, FunctionTypeNode):
             return isinstance(other, AnyTypeNode)
         elif not self.return_type.is_assignable_to(other.return_type):

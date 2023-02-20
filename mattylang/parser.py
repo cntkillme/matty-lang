@@ -29,7 +29,7 @@ class Parser:
 
     def __parse_program(self) -> ProgramNode:
         start = self.lexer.position
-        return ProgramNode(self.__parse_chunk(terminator='eof', start=start), position=start)
+        return ProgramNode(start, self.__parse_chunk(terminator='eof', start=start))
 
     def __parse_statement(self) -> Optional[StatementNode]:
         token = self.lexer.peek()
@@ -43,7 +43,7 @@ class Parser:
             token = self.lexer.scan()  # skip 'def'
             identifier = self.__parse_identifier()
 
-            if identifier.value == '#invalid':
+            if identifier.value == '#error':
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: expected identifier for definition, got {token}', token.position)
 
@@ -62,22 +62,22 @@ class Parser:
             return self.__parse_while_statement()
         elif token.kind == 'break':  # break statement
             self.lexer.scan()
-            return BreakStatementNode(position=token.position)
+            return BreakStatementNode(token.position)
         elif token.kind == 'continue':  # continue statement
             self.lexer.scan()
-            return ContinueStatementNode(position=token.position)
+            return ContinueStatementNode(token.position)
         elif token.kind == 'return':  # return statement
             self.lexer.scan()
-            return ReturnStatementNode(self.__parse_expression(), position=token.position)
+            return ReturnStatementNode(token.position, self.__parse_expression())
         elif token.kind == 'identifier':  # variable assignment or call expression
-            identifier = IdentifierNode(token.lexeme, position=token.position)
+            identifier = IdentifierNode(token.position, token.lexeme)
             token = self.lexer.scan()
 
             if token.kind == '=':  # variable assignment
                 return self.__parse_variable_assignment(identifier)
             elif token.kind == '(':  # call statement
                 call_expression = self.__parse_call_expression(identifier)
-                return CallStatementNode(call_expression, position=call_expression.position)
+                return CallStatementNode(call_expression.position, call_expression)
             else:
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: unexpected {identifier}', identifier.position)
@@ -92,7 +92,7 @@ class Parser:
             else:
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'syntax: unexpected {expression}', expression.position)
-                return VariableDefinitionNode(IdentifierNode('#invalid'), expression)
+                return VariableDefinitionNode(expression.position, IdentifierNode(expression.position, '#error'), expression)
 
     def __parse_chunk(self, terminator: str, start: int):
         statements: List[StatementNode] = []
@@ -104,53 +104,55 @@ class Parser:
                 statements.append(statement)
             token = self.lexer.peek()
 
-        return ChunkNode(statements, position=start)
+        return ChunkNode(start, statements)
 
     def __parse_variable_definition(self, identifier: IdentifierNode, start: int):
         self.lexer.scan()  # skip '='
-        initializer = self.__expect_expression(f'to initialize variable {identifier.value}') or NilLiteralNode()
-        return VariableDefinitionNode(identifier, initializer, position=start)
+        initializer = self.__expect_expression(
+            f'to initialize variable {identifier.value}') or NilLiteralNode(self.lexer.peek().position)
+        return VariableDefinitionNode(start, identifier, initializer)
 
     def __parse_variable_assignment(self, identifier: IdentifierNode):
         self.lexer.scan()  # skip '='
-        initializer = self.__expect_expression(f'to assign variable {identifier.value}') or NilLiteralNode()
-        return VariableAssignmentNode(identifier, initializer, position=identifier.position)
+        initializer = self.__expect_expression(
+            f'to assign variable {identifier.value}') or NilLiteralNode(self.lexer.peek().position)
+        return VariableAssignmentNode(identifier.position, identifier, initializer)
 
     def __parse_if_statement(self):
         start = self.lexer.peek().position
         self.lexer.scan()  # skip 'if'
         self.__expect('(', 'to open if condition')
-        if_condition = self.__expect_expression('after (') or BoolLiteralNode(False)
+        if_condition = self.__expect_expression('after (') or BoolLiteralNode(self.lexer.peek().position, False)
         self.__expect(')', 'to close if condition')
-        if_body = self.__expect_statement('after )') or ChunkNode()
+        if_body = self.__expect_statement('after )') or ChunkNode(self.lexer.peek().position)
         else_body = None
 
         if self.lexer.peek().kind == 'else':
             self.lexer.scan()
-            else_body = self.__expect_statement('after else') or ChunkNode()
+            else_body = self.__expect_statement('after else') or ChunkNode(self.lexer.peek().position)
 
         # transform non-chunk statement into chunk
         if not isinstance(if_body, ChunkNode):
-            if_body = ChunkNode([if_body], position=if_body.position)
+            if_body = ChunkNode(if_body.position, [if_body])
 
         # transform non-chunk statement into chunk
         if else_body is not None and not isinstance(else_body, ChunkNode):
-            else_body = ChunkNode([else_body], position=else_body.position)
+            else_body = ChunkNode(else_body.position, [else_body])
 
-        return IfStatementNode(if_condition, if_body, else_body, position=start)
+        return IfStatementNode(start, if_condition, if_body, else_body)
 
     def __parse_while_statement(self):
         start = self.lexer.peek().position
         self.__expect('(', 'to open while condition')
-        condition = self.__expect_expression('after while') or BoolLiteralNode(False)
+        condition = self.__expect_expression('after while') or BoolLiteralNode(self.lexer.peek().position, False)
         self.__expect(')', 'to close while condition')
-        body = self.__expect_statement('after while') or ChunkNode()
+        body = self.__expect_statement('after while') or ChunkNode(self.lexer.peek().position)
 
         # transform non-chunk statement chunk
         if not isinstance(body, ChunkNode):
-            body = ChunkNode([body], position=body.position)
+            body = ChunkNode(body.position, [body])
 
-        return WhileStatementNode(condition, body, position=start)
+        return WhileStatementNode(start, condition, body)
 
     def __parse_function_definition(self, identifier: IdentifierNode, start: int):
         self.__expect('(', 'to specify function parameters')
@@ -162,14 +164,14 @@ class Parser:
             body = self.__parse_chunk(terminator='}', start=position)
             self.__expect('}', 'to close function body')
         else:
-            body = ChunkNode()
+            body = ChunkNode(position)
 
-        return FunctionDefinitionNode(identifier, parameters, body, position=start)
+        return FunctionDefinitionNode(start, identifier, parameters, body)
 
     def __parse_function_parameter(self, identifier: IdentifierNode):
         self.__expect(':', 'to specify parameter type')
-        type = self.__expect_type('to specify parameter type') or AnyTypeNode()
-        return FunctionParameterNode(identifier, type, position=identifier.position)
+        type = self.__expect_type('to specify parameter type') or AnyTypeNode(self.lexer.peek().position)
+        return FunctionParameterNode(identifier.position, identifier, type)
 
     def __parse_parameter_list(self):
         parameters: List[FunctionParameterNode] = []
@@ -178,7 +180,7 @@ class Parser:
         while token.kind != ')' and token.kind != 'eof':
             identifier = self.__parse_identifier()
 
-            if identifier.value != '#invalid;':
+            if identifier.value != '#error':
                 parameters.append(self.__parse_function_parameter(identifier))
                 token = self.lexer.peek()
 
@@ -207,23 +209,23 @@ class Parser:
 
         if token.kind == 'nil':
             self.lexer.scan()
-            return NilLiteralNode(position=token.position)
+            return NilLiteralNode(token.position)
         elif token.kind == 'true':
             self.lexer.scan()
-            return BoolLiteralNode(True, position=token.position)
+            return BoolLiteralNode(token.position, True)
         elif token.kind == 'false':
             self.lexer.scan()
-            return BoolLiteralNode(False, position=token.position)
+            return BoolLiteralNode(token.position, False)
         elif token.kind == 'real_literal':
             self.lexer.scan()
             try:
                 # lexer invariant: token.lexeme is a valid float
-                return RealLiteralNode(float(token.lexeme), position=token.position)
+                return RealLiteralNode(token.position, float(token.lexeme))
             except ValueError:
                 assert False, f'invalid real literal {token.lexeme}'
         elif token.kind == 'string_literal':
             self.lexer.scan()
-            return StringLiteralNode(token.lexeme, position=token.position)
+            return StringLiteralNode(token.position, token.lexeme)
         elif token.kind == 'identifier':  # identifier or function call
             identifier = self.__parse_identifier()
 
@@ -237,19 +239,17 @@ class Parser:
     def __parse_identifier(self) -> IdentifierNode:
         token = self.lexer.peek()
         if token.kind == 'identifier':
-            node = IdentifierNode(token.lexeme, position=token.position)
+            node = IdentifierNode(token.position, token.lexeme)
             self.lexer.scan()
             return node
         else:
-            return IdentifierNode('#error', position=token.position)
+            return IdentifierNode(token.position, '#error')
 
     def __parse_call_expression(self, identifier: IdentifierNode) -> CallExpressionNode:
         self.__expect('(', 'to open function arguments')
         arguments = self.__parse_expression_list()
         self.__expect(')', 'to close function arguments')
-        node = CallExpressionNode(identifier, arguments)
-        node.position = identifier.position
-        return node
+        return CallExpressionNode(identifier.position, identifier, arguments)
 
     def __parse_unary_expression(self) -> ExpressionNode | None:
         operator = self.lexer.peek()
@@ -264,7 +264,7 @@ class Parser:
                     'error', f'syntax: expected expression after {operator} (got {next_token})', next_token.position)
                 return None
 
-            expr = UnaryExpressionNode(operator.kind, operand)
+            expr = UnaryExpressionNode(operator.position, operator.kind, operand)
             expr.position = operator.position
             return expr
         else:
@@ -290,9 +290,7 @@ class Parser:
                 return left
 
             # Create binary expression node, and assign it as the left operand for the next iteration.
-            position = left.position
-            left = BinaryExpressionNode(operator.kind, left, right)
-            left.position = position
+            left = BinaryExpressionNode(left.position, operator.kind, left, right)
             operator = self.lexer.peek()
 
         return left
@@ -303,31 +301,28 @@ class Parser:
         if token.kind == '(':
             return self.__parse_function_type()
         elif token.kind == 'Nil':
-            node = NilTypeNode()
+            self.lexer.scan()
+            return NilTypeNode(token.position)
         elif token.kind == 'Bool':
-            node = BoolTypeNode()
+            self.lexer.scan()
+            return BoolTypeNode(token.position)
         elif token.kind == 'Real':
-            node = RealTypeNode()
+            self.lexer.scan()
+            return RealTypeNode(token.position)
         elif token.kind == 'String':
-            node = StringTypeNode()
+            self.lexer.scan()
+            return StringTypeNode(token.position)
         else:
             return None
 
-        node.position = token.position
-        self.lexer.scan()
-        return node
-
     def __parse_function_type(self) -> FunctionTypeNode | None:
-
         position = self.lexer.peek().position
         self.__expect('(', 'to open function type')
         parameter_types = self.__parse_type_list()
         self.__expect(')', 'to close function type')
         self.__expect('->', 'to specify return type')
-        return_type = self.__expect_type('after ->') or AnyTypeNode()
-        node = FunctionTypeNode(parameter_types, return_type)
-        node.position = position
-        return node
+        return_type = self.__expect_type('after ->') or AnyTypeNode(self.lexer.peek().position)
+        return FunctionTypeNode(position, parameter_types, return_type)
 
     def __parse_type_list(self):
         types: List[TypeNode] = []

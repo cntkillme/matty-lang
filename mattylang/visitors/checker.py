@@ -1,3 +1,5 @@
+from typing import List
+
 from mattylang.ast import *
 from mattylang.module import Module
 from mattylang.visitor import AbstractVisitor
@@ -7,6 +9,36 @@ class Checker(AbstractVisitor):
     def __init__(self, module: Module):
         super().__init__()
         self.module = module
+        self.__untyped_references: List[IdentifierNode] = []
+
+    def visit_chunk(self, node: ChunkNode):
+        super().visit_chunk(node)  # visit children
+        parent = node.parent_chunk
+
+        # merge chunk return types excluding function body/top level scope
+        if parent is not None:
+            if parent.return_type is None:
+                parent.return_type = node.return_type
+            elif node.return_type is not None:
+                if not node.return_type.is_assignable_to(parent.return_type):
+                    self.module.diagnostics.emit_diagnostic(
+                        'error', f'analysis: incompatible return type {node.return_type}, expected {parent.return_type}', node.return_type.position)
+
+        # handle untyped nodes again (for recursion)
+        for identifier in self.__untyped_references:
+            if identifier.symbol is None or identifier.symbol.type is None:
+                continue
+
+            identifier.accept(self)
+            self.module.diagnostics.emit_diagnostic(
+                'info', f'analysis: late-typed {identifier} to be of type {identifier.type}', identifier.position)
+
+            # recursively type expressions upwards
+            identifier = identifier.parent
+            while isinstance(identifier, ExpressionNode) and identifier.type is None:
+                identifier.accept(self)
+                self.module.diagnostics.emit_diagnostic(
+                    'info', f'analysis: late-typed {identifier} to be of type {identifier.type}', identifier.position)
 
     def visit_variable_definition(self, node: VariableDefinitionNode):
         node.initializer.accept(self)
@@ -35,7 +67,7 @@ class Checker(AbstractVisitor):
         node.condition.accept(self)
         condition_type = node.condition.type
 
-        if condition_type is not None and not condition_type.is_equivalent(BoolTypeNode()):
+        if condition_type is not None and not condition_type.is_equivalent(BoolTypeNode(0)):
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: expected type of condition to be Bool (got {condition_type})', node.condition.position)
             return
@@ -48,7 +80,7 @@ class Checker(AbstractVisitor):
         node.condition.accept(self)
         condition_type = node.condition.type
 
-        if condition_type is not None and not condition_type.is_equivalent(BoolTypeNode()):
+        if condition_type is not None and not condition_type.is_equivalent(BoolTypeNode(0)):
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: expected type of condition to be Bool (got {condition_type})', node.condition.position)
             return
@@ -71,16 +103,16 @@ class Checker(AbstractVisitor):
         if node.identifier.symbol is None:
             return
 
-        # TODO: control flow analysis, ensure all paths lead to a return statement
-
         # type inference: return type of function = return type of body
         if node.body.return_type is None:
-            node.body.return_type = NilTypeNode()
+            node.body.return_type = NilTypeNode(node.position)
 
         parameter_types = [parameter.type for parameter in node.parameters]
-        node.identifier.symbol.type = FunctionTypeNode(parameter_types, node.body.return_type)
+        node.identifier.symbol.type = FunctionTypeNode(node.position, parameter_types, node.body.return_type)
 
     def visit_function_parameter(self, node: FunctionParameterNode):
+        if node.identifier.symbol:
+            node.identifier.symbol.type = node.type
         super().visit_function_parameter(node)  # visit children
 
     def visit_return_statement(self, node: ReturnStatementNode):
@@ -92,8 +124,11 @@ class Checker(AbstractVisitor):
                 'error', 'analysis: return statement outside of function', node.position)
             return
 
-        return_type = node.value.type or NilTypeNode() if node.value is not None else NilTypeNode()
+        return_type = node.value.type if node.value is not None else NilTypeNode(node.position)
         chunk_type = enclosing_function.body.return_type
+
+        if return_type is None:
+            return
 
         if chunk_type is not None and not return_type.is_assignable_to(chunk_type):
             self.module.diagnostics.emit_diagnostic(
@@ -104,7 +139,7 @@ class Checker(AbstractVisitor):
 
     def visit_call_statement(self, node: 'CallStatementNode'):
         super().visit_call_statement(node)
-        if node.call_expression.type and not node.call_expression.type.is_assignable_to(NilTypeNode()):
+        if node.call_expression.type and not node.call_expression.type.is_assignable_to(NilTypeNode(0)):
             self.module.diagnostics.emit_diagnostic(
                 'warning', f'analysis: return value discarded', node.position)
 
@@ -123,17 +158,30 @@ class Checker(AbstractVisitor):
     def visit_identifier(self, node: IdentifierNode):
         if node.symbol is not None:
             node.type = node.symbol.type
+            if node.type is None:
+                self.__untyped_references.append(node)
 
     def visit_call_expression(self, node: CallExpressionNode):
         super().visit_call_expression(node)  # visit children
         symbol = node.identifier.symbol
 
-        if symbol is None:
+        if symbol is None or symbol.type is None:
             return
 
-        parameter_types: List[TypeNode] = [argument.type or AnyTypeNode(
+        if not isinstance(symbol.type, FunctionTypeNode):
+            self.module.diagnostics.emit_diagnostic(
+                'error', f'analysis: expected function type when calling {symbol.name}, got {symbol.type}', node.position)
+            return
+
+        # TODO: support recursion
+        argument_types: List[TypeNode] = [argument.type or AnyTypeNode(
             position=argument.position) for argument in node.arguments]
-        return_type = symbol.type or FreeTypeNode(position=node.position)
+        call_type = FunctionTypeNode(node.position, argument_types, AnyTypeNode(position=node.position))
+        node.type = symbol.type.return_type
+
+        if not call_type.is_equivalent(symbol.type):
+            self.module.diagnostics.emit_diagnostic(
+                'error', f'analysis: incompatible types for call, expected {symbol.type} (got {call_type})', node.position)
 
     def visit_unary_expression(self, node: UnaryExpressionNode):
         super().visit_unary_expression(node)  # visit children
@@ -142,19 +190,19 @@ class Checker(AbstractVisitor):
             return
 
         if operator == '-':
-            if not value_type.is_equivalent(RealTypeNode()):
+            if not value_type.is_equivalent(RealTypeNode(0)):
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
                 return
 
             node.type = value_type
         elif operator == '!':
-            if not value_type.is_equivalent(BoolTypeNode()):
+            if not value_type.is_equivalent(BoolTypeNode(0)):
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
                 return
 
-            node.type = BoolTypeNode()
+            node.type = BoolTypeNode(position=node.position)
         else:
             assert False, f'unary operator {operator} is invalid'  # lexer invariant: all unary operators are valid
 
@@ -168,25 +216,25 @@ class Checker(AbstractVisitor):
         if left_type is None or right_type is None:
             return
 
-        type_error = left_type.is_equivalent(right_type)
+        type_error = not left_type.is_equivalent(right_type)
         result_type = left_type
 
         if operator == '+':
             result_type = left_type
-            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode())
-                                            or left_type.is_assignable_to(StringTypeNode()))
+            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode(0))
+                                            or left_type.is_assignable_to(StringTypeNode(0)))
         elif operator in {'-', '*', '/', '%'}:
             result_type = left_type
-            type_error = type_error or not left_type.is_assignable_to(RealTypeNode())
+            type_error = type_error or not left_type.is_assignable_to(RealTypeNode(0))
         elif operator in {'==', '!='}:
-            result_type = BoolTypeNode()
+            result_type = BoolTypeNode(node.position)
         elif operator in {'<', '<=', '>', '>='}:
-            result_type = BoolTypeNode()
-            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode())
-                                            or left_type.is_assignable_to(StringTypeNode()))
+            result_type = BoolTypeNode(node.position)
+            type_error = type_error or not (left_type.is_assignable_to(RealTypeNode(0))
+                                            or left_type.is_assignable_to(StringTypeNode(0)))
         elif operator in {'||', '&&'}:
-            result_type = BoolTypeNode()
-            type_error = type_error or not left_type.is_assignable_to(BoolTypeNode())
+            result_type = BoolTypeNode(node.position)
+            type_error = type_error or not left_type.is_assignable_to(BoolTypeNode(0))
         else:
             assert False, f'binary operator {operator} is invalid'  # lexer invariant: all binary operators are valid
 
@@ -196,44 +244,3 @@ class Checker(AbstractVisitor):
             return
 
         node.type = result_type
-
-
-"""
-    Type inference for the return type of a function. The process is as follows:
-    1. Check and merge the types of all return statements
-    2. If the function body has a return statement, the return type of the function is the type of the return statement.
-    3. If the function body does not have a return statement, the return type of the function is nil.
-    4. For all
-"""
-
-
-class ReturnTypeInference(AbstractVisitor):
-    def __init__(self, module: Module):
-        self.module = module
-
-    def visit_chunk(self, node: ChunkNode):
-        super().visit_chunk(node)  # visit children
-        parent = node.parent_chunk
-
-        # case 1: chunk is a function body
-        if parent is None:
-            # functions that do not return anything will return nil
-            node.return_type = node.return_type or NilTypeNode()
-            return
-
-        # case 2: merge return type with parent
-        if node.return_type is not None:
-            if parent.return_type is None:
-                parent.return_type = node.return_type
-            elif not node.return_type.is_assignable_to(parent.return_type):
-                self.module.diagnostics.emit_diagnostic(
-                    'error', f'analysis: incompatible return type of {node.return_type} to {parent.return_type}', node.return_type.position)
-                return
-
-        # Merge chunks' return type with their parent
-
-    def visit_function_definition(self, node: FunctionDefinitionNode):
-        node.body.accept(self)  # visit children
-
-        if node.identifier.symbol is None:
-            return
