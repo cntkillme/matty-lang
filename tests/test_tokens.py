@@ -17,7 +17,7 @@ class TokensTest(unittest.TestCase):
             lexer.scan()
 
         result = list(map(str, tokens))
-        self.assertEqual(expected, result)
+        self.assertEqual(result, expected)
 
     def test_lexer(self):
         expected = [
@@ -88,4 +88,5 @@ class TokensTest(unittest.TestCase):
         # compare diagnostics
         result = [(diagnostic.kind, expected[idx][1] if diagnostic.message.find(expected[idx][1]) != -
                    1 else diagnostic.message) for idx, diagnostic in enumerate(lexer.module.diagnostics)]
+
         self.assertEqual(result, expected)

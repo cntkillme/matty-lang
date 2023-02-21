@@ -22,10 +22,6 @@ class LineMap:
         return bisect_right(self.__line_starts, position)
 
     # Time Complexity: O(log(count('\n')))
-    def get_column(self, position: int) -> int:
-        return 1 + (position - self.__line_starts[self.get_line(position) - 1])
-
-    # Time Complexity: O(log(count('\n')))
     def get_location(self, position: int) -> Tuple[int, int]:
         line = self.get_line(position)
         column = 1 + (position - self.__line_starts[line - 1])
