@@ -16,7 +16,8 @@ class TestParser(unittest.TestCase):
             if isinstance(value, AbstractNode):
                 tld[key] = self.make_dict(value)
             elif isinstance(value, list):
-                tld[key] = [self.make_dict(item) if isinstance(item, AbstractNode) else item for item in value]
+                tld[key] = [self.make_dict(item) if isinstance(item, AbstractNode)
+                            else item for item in value]  # type: ignore
             elif not isinstance(value, object):
                 tld[key] = value
 

@@ -26,15 +26,7 @@ class PythonSafeVariableRenamer(AbstractVisitor):
         if name == new_name:
             return
 
-        # rename the variable in the symbol table
-        del symbol.scope.variables[name]
-        symbol.scope.variables[new_name] = symbol
-        symbol.name = new_name
-
-        # rename the variable references
-        for identifier in symbol.references:
-            identifier.value = new_name
-
+        symbol.rename(new_name)
         self.module.diagnostics.emit_diagnostic(
             'info', f'emitter: renamed variable {name} to {new_name}', symbol.get_node().position)
 
