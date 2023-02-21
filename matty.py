@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 
+from mattylang import compile
 from mattylang.globals import Globals
 from mattylang.lexer import Lexer
 from mattylang.module import Module
-from mattylang.parser import Parser
-from mattylang.visitors.binder import Binder
-from mattylang.visitors.checker import Checker
-from mattylang.visitors.emitter import Emitter
 from mattylang.visitors.printers import AstPrinter, SymbolPrinter
 
 
@@ -34,62 +31,44 @@ def main() -> None:
     while True:
         try:
             source = input('> ')
-            run(parsed, 'stdin', source, no_default_output=True)
+            run(parsed, 'stdin', source, no_file_output=True)
         except EOFError:
             break
 
 
-def run(args: argparse.Namespace, file: str, source: str, no_default_output: bool = False):
-    module = Module(file, source, globals=Globals().globals, verbose=args.verbose)
-
+def run(args: argparse.Namespace, file: str, source: str, no_file_output: bool = False):
     if args.tokens:
+        module = Module(file, source, globals=Globals().globals, verbose=args.verbose)
         lexer = Lexer(module)
         while lexer.peek().kind != 'eof':
-            line, column = module.line_map.get_location(lexer.peek().position)
+            line, column = module.line_map.get_location(lexer.token_position())
             print(f'{file}:{line}:{column}: {lexer.peek()}')
             lexer.scan()
 
-        module.reset()  # reset module (clears diagnostics)
-
-    program = Parser(Lexer(module)).parse()  # lexical, syntax analysis
-
-    if not args.parse_only:
-        program.accept(Binder(module))  # semantic analysis: symbol binding/name resolution
-        program.accept(Checker(module))  # semantic analysis: type binding/type checking and inference
+    result = compile(file, source, verbose=args.verbose, parse_only=args.parse_only, globals=Globals().globals)
 
     if args.syntax:
-        program.accept(AstPrinter(module))
+        result.ast.accept(AstPrinter(result.module))
 
     if args.symbols:
-        program.accept(SymbolPrinter(module))
+        result.ast.accept(SymbolPrinter(result.module))
 
-    if module.diagnostics.has_error():
-        module.print_diagnostics()
-        return 1
-    elif args.parse_only:
-        module.print_diagnostics()
-        return 0
+    if args.code and result.code is not None:
+        print(result.code)
 
-    emitter = Emitter(module)
-    program.accept(emitter)  # code generation
-    module.print_diagnostics()
+    if not no_file_output:
+        if args.output:
+            new_file = args.output
 
-    if module.diagnostics.has_error():
-        return 1
+        if result.code is not None:
+            new_file = file.split('/')[-1].split('\\')[-1]  # get file name
+            new_file = new_file.rsplit('.mtl', 1)[0] + '.py'  # remove .mtl extension, add .py extension
 
-    if args.code:
-        print(str(emitter))
+            with open(new_file, 'w') as fd:
+                fd.write(result.code)
 
-    if args.output:
-        new_file = args.output
-    elif not no_default_output:
-        new_file = file.split('/')[-1].split('\\')[-1]  # get file name
-        new_file = new_file.rsplit('.mtl', 1)[0] + '.py'  # remove .mtl extension, add .py extension
-
-        with open(new_file, 'w') as fd:
-            fd.write(str(emitter))
-
-    return 0
+    result.module.print_diagnostics()
+    return 1 if result.module.diagnostics.has_error() else 0
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 from string import ascii_letters, digits, punctuation, whitespace
 from typing import Callable, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from mattylang.module import Module
 
 
@@ -26,12 +26,11 @@ class Lexer:
     def __init__(self, module: 'Module'):
         self.module = module
         self.source = module.source
-        self.position = 0
+        self.__position = 0
         self.__token: Optional[Token] = None
 
-    def reset(self):
-        self.position = 0
-        self.__token = None
+    def token_position(self):
+        return self.peek().position
 
     def peek(self):
         if self.__token is None:
@@ -54,7 +53,7 @@ class Lexer:
     def __scan_impl(self) -> Token:
         chr = self.__get_char()
         diagnostics = self.module.diagnostics
-        position = self.position
+        position = self.__position
 
         if chr == '':  # eof
             return Token('eof', '', position)
@@ -80,8 +79,8 @@ class Lexer:
                 lexeme = lexeme + '.' + self.__collect_lexeme(lambda chr: chr in self.__digit_set)
 
             if lexeme == '.':
-                diagnostics.emit_diagnostic('error', f'syntax: unexpected character .', position)
-                return self.__scan_impl()
+                diagnostics.emit_diagnostic('error', f'syntax: expected digits around decimal point', position)
+                return Token('real_literal', '0.0', position)
 
             if self.__get_char() in self.__id_init_set or self.__get_char() == '.':
                 diagnostics.emit_diagnostic(
@@ -95,7 +94,7 @@ class Lexer:
 
             if self.__get_char() != quote:
                 diagnostics.emit_diagnostic(
-                    'error', f'syntax: expected {quote} to terminate string', self.position)
+                    'error', f'syntax: expected {quote} to terminate string', self.__position)
             else:
                 self.__next_char()
 
@@ -115,19 +114,19 @@ class Lexer:
                 return self.__scan_impl()
 
     def __get_char(self):
-        return self.source[self.position] if self.position < len(self.source) else ''
+        return self.source[self.__position] if self.__position < len(self.source) else ''
 
     def __next_char(self):
-        if self.position < len(self.source):
-            self.position += 1
+        if self.__position < len(self.source):
+            self.__position += 1
         return self.__get_char()
 
     def __next_char_while(self, predicate: Callable[[str], bool]):
-        while self.position < len(self.source) and predicate(self.__get_char()):
+        while self.__position < len(self.source) and predicate(self.__get_char()):
             self.__next_char()
         return chr
 
     def __collect_lexeme(self, predicate: Callable[[str], bool]):
-        start = self.position
+        start = self.__position
         self.__next_char_while(predicate)
-        return self.source[start:self.position]
+        return self.source[start:self.__position]

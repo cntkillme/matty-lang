@@ -15,10 +15,6 @@ class Module:
         self.diagnostics = Diagnostics(verbose)
         self.line_map = LineMap(source)
 
-    def reset(self):
-        self.globals.reset()
-        self.diagnostics = Diagnostics(self.verbose)
-
     def format_diagnostic(self, diagnostic: Diagnostic):
         line, column = self.line_map.get_location(diagnostic.position)
         return f'{self.file}:{line}:{column}: {diagnostic}'

@@ -1,4 +1,4 @@
-# v0.1.mtl - do not edit
+# v0.1.mtl
 def _nil = nil
 def _true = true
 def _false = false

@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from mattylang.ast import *
 
 
@@ -57,10 +57,6 @@ class SymbolTable:
         self.children: List[SymbolTable] = []  # represents the scopes nested within this scope
         self.boundary = boundary  # represents whether this scope is a boundary (e.g., at function definitions)
         self.variables: Dict[str, Symbol] = {}  # represents the variables declared in this scope
-
-    def reset(self):
-        self.children.clear()
-        self.variables.clear()
 
     def enclosing_boundary(self) -> Optional['SymbolTable']:
         if self.parent is None:

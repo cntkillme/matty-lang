@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, cast, List, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from mattylang.symbols import Symbol, SymbolTable
     from mattylang.visitor import AbstractVisitor
 

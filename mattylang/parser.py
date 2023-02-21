@@ -8,10 +8,6 @@ class Parser:
         self.lexer = lexer
         self.__program: Optional[ProgramNode] = None
 
-    def reset(self):
-        self.lexer.reset()
-        self.__program = None
-
     def parse(self) -> ProgramNode:
         if self.__program is None:
             self.__program = self.__parse_program()
@@ -28,7 +24,7 @@ class Parser:
     }
 
     def __parse_program(self) -> ProgramNode:
-        start = self.lexer.position
+        start = self.lexer.token_position()
         return ProgramNode(start, self.__parse_chunk(terminator='eof', start=start))
 
     def __parse_statement(self) -> Optional[StatementNode]:
@@ -109,27 +105,27 @@ class Parser:
     def __parse_variable_definition(self, identifier: IdentifierNode, start: int):
         self.lexer.scan()  # skip '='
         initializer = self.__expect_expression(
-            f'to initialize variable {identifier.value}') or NilLiteralNode(self.lexer.peek().position)
+            f'to initialize variable {identifier.value}') or NilLiteralNode(self.lexer.token_position())
         return VariableDefinitionNode(start, identifier, initializer)
 
     def __parse_variable_assignment(self, identifier: IdentifierNode):
         self.lexer.scan()  # skip '='
         initializer = self.__expect_expression(
-            f'to assign variable {identifier.value}') or NilLiteralNode(self.lexer.peek().position)
+            f'to assign variable {identifier.value}') or NilLiteralNode(self.lexer.token_position())
         return VariableAssignmentNode(identifier.position, identifier, initializer)
 
     def __parse_if_statement(self):
-        start = self.lexer.peek().position
+        start = self.lexer.token_position()
         self.lexer.scan()  # skip 'if'
         self.__expect('(', 'to open if condition')
-        if_condition = self.__expect_expression('after (') or BoolLiteralNode(self.lexer.peek().position, False)
+        if_condition = self.__expect_expression('after (') or BoolLiteralNode(self.lexer.token_position(), False)
         self.__expect(')', 'to close if condition')
-        if_body = self.__expect_statement('after )') or ChunkNode(self.lexer.peek().position)
+        if_body = self.__expect_statement('after )') or ChunkNode(self.lexer.token_position())
         else_body = None
 
         if self.lexer.peek().kind == 'else':
             self.lexer.scan()
-            else_body = self.__expect_statement('after else') or ChunkNode(self.lexer.peek().position)
+            else_body = self.__expect_statement('after else') or ChunkNode(self.lexer.token_position())
 
         # transform non-chunk statement into chunk
         if not isinstance(if_body, ChunkNode):
@@ -142,12 +138,12 @@ class Parser:
         return IfStatementNode(start, if_condition, if_body, else_body)
 
     def __parse_while_statement(self):
-        start = self.lexer.peek().position
+        start = self.lexer.token_position()
         self.lexer.scan()  # skip 'while'
         self.__expect('(', 'to open while condition')
-        condition = self.__expect_expression('after while') or BoolLiteralNode(self.lexer.peek().position, False)
+        condition = self.__expect_expression('after while') or BoolLiteralNode(self.lexer.token_position(), False)
         self.__expect(')', 'to close while condition')
-        body = self.__expect_statement('after while') or ChunkNode(self.lexer.peek().position)
+        body = self.__expect_statement('after while') or ChunkNode(self.lexer.token_position())
 
         # transform non-chunk statement chunk
         if not isinstance(body, ChunkNode):
@@ -160,7 +156,7 @@ class Parser:
         parameters = self.__parse_parameter_list()
         self.__expect(')', 'to close function parameters')
 
-        position = self.lexer.peek().position
+        position = self.lexer.token_position()
         if self.__expect('{', 'to open function body'):
             body = self.__parse_chunk(terminator='}', start=position)
             self.__expect('}', 'to close function body')
@@ -171,7 +167,7 @@ class Parser:
 
     def __parse_function_parameter(self, identifier: IdentifierNode):
         self.__expect(':', 'to specify parameter type')
-        type = self.__expect_type('to specify parameter type') or AnyTypeNode(self.lexer.peek().position)
+        type = self.__expect_type('to specify parameter type') or AnyTypeNode(self.lexer.token_position())
         return FunctionParameterNode(identifier.position, identifier, type)
 
     def __parse_parameter_list(self):
@@ -317,12 +313,12 @@ class Parser:
             return None
 
     def __parse_function_type(self) -> FunctionTypeNode | None:
-        position = self.lexer.peek().position
+        position = self.lexer.token_position()
         self.__expect('(', 'to open function type')
         parameter_types = self.__parse_type_list()
         self.__expect(')', 'to close function type')
         self.__expect('->', 'to specify return type')
-        return_type = self.__expect_type('after ->') or AnyTypeNode(self.lexer.peek().position)
+        return_type = self.__expect_type('after ->') or AnyTypeNode(self.lexer.token_position())
         return FunctionTypeNode(position, parameter_types, return_type)
 
     def __parse_type_list(self):
