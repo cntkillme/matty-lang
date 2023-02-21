@@ -43,12 +43,8 @@ class TokensTest(unittest.TestCase):
                     return lexeme
 
         def from_token(token: Token) -> str | Tuple[str, str]:
-            if token.kind == 'identifier':
-                return 'identifier', token.lexeme
-            elif token.kind == 'real_literal':
-                return 'real_literal', token.lexeme
-            elif token.kind == 'string_literal':
-                return 'string_literal', token.lexeme
+            if token.kind in {'identifier', 'real_literal', 'string_literal'}:
+                return token.kind, token.lexeme
             else:
                 return token.kind
 
@@ -76,7 +72,6 @@ class TokensTest(unittest.TestCase):
 
         source = ' .\n1.a\n# asd\n"asd\n;'
         lexer = Lexer(Module('test', source))
-        print("PEEK", lexer.peek())
         self.assertEqual(lexer.token_position(), 1)
 
         # get tokens
