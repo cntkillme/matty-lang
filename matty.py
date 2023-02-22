@@ -67,6 +67,9 @@ def run(args: argparse.Namespace, file: str, source: str, no_file_output: bool =
             with open(new_file, 'w') as fd:
                 fd.write(result.code)
 
+    if result.code is not None:
+        exec(result.code, globals(), globals())
+
     result.module.print_diagnostics()
     return 1 if result.module.diagnostics.has_error() else 0
 

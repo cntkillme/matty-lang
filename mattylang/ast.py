@@ -340,32 +340,6 @@ class TypeNode(AbstractNode, ABC):
         return self.is_assignable_to(other) and other.is_assignable_to(self)
 
 
-# class FreeTypeNode(TypeNode):
-#     next_free_id = 0
-
-#     def __init__(self, position: int, id: Optional[int] = None):
-#         super().__init__(position)
-#         self.id = id or FreeTypeNode.next_free_id
-#         self.types: List[TypeNode] = []
-#         if id is None:
-#             FreeTypeNode.next_free_id += 1
-
-#     def __str__(self) -> str:
-#         return f'Free{self.id}'
-
-#     def accept(self, visitor: 'AbstractVisitor') -> None:
-#         assert False, 'fatal: free type should not be visited'
-
-#     def is_assignable_to(self, other: TypeNode):
-#         return isinstance(other, AnyTypeNode) or (isinstance(other, FreeTypeNode) and other.id == self.id)
-
-#     def merge(self) -> Optional[TypeNode]:
-#         if len(self.types) == 1:
-#             return self.types[0]
-#         else:
-#             return None
-
-
 class AnyTypeNode(TypeNode):
     def __init__(self, position: int):
         super().__init__(position)
