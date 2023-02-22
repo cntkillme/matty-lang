@@ -31,6 +31,9 @@ class Diagnostics:
     def __iter__(self):
         return iter(self.__diagnostics)
 
+    def __len__(self):
+        return len(self.__diagnostics)
+
     def has_error(self):
         return self.__has_error
 

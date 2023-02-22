@@ -71,7 +71,8 @@ class TokensTest(unittest.TestCase):
         ]
 
         source = ' .\n1.a\n# asd\n"asd\n;'
-        lexer = Lexer(Module('test', source))
+        module = Module('test', source)
+        lexer = Lexer(module)
         self.assertEqual(lexer.token_position(), 1)
 
         # get tokens
@@ -81,7 +82,10 @@ class TokensTest(unittest.TestCase):
             lexer.scan()
 
         # compare diagnostics
+        if len(module.diagnostics) > len(expected):
+            expected += [('', '')] * (len(module.diagnostics) - len(expected))
+
         result = [(diagnostic.kind, expected[idx][1] if diagnostic.message.find(expected[idx][1]) != -
-                   1 else diagnostic.message) for idx, diagnostic in enumerate(lexer.module.diagnostics)]
+                   1 else diagnostic.message) for idx, diagnostic in enumerate(module.diagnostics)]
 
         self.assertEqual(result, expected)
