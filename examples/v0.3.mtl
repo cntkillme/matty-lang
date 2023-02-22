@@ -1,13 +1,13 @@
+def PI = 3.141592654
 # v0.3.mtl
 
-# fib(0) = 1
-# fib(1) = 1
-# fib(n) = fib(n - 1) + fib(n - 2)
 def fib(n: Real) {
-	if (n <= 1)
-		return 1
-	else
+	if (n > 1)
 		return fib(n - 1) + fib(n - 2)
+	return 1
 }
 
-def f5 = fib(5) # 8
+print("PI")
+print(PI)
+print("fib(5)")
+print(fib(5)) # 8

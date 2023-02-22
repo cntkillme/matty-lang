@@ -15,6 +15,7 @@ class Checker(AbstractVisitor):
         super().visit_chunk(node)  # visit children
         parent = node.parent_chunk
 
+        # type inference: return type of function = return type of body
         # merge chunk return types excluding function body/top level scope
         if parent is not None:
             if parent.return_type is None:
@@ -103,9 +104,14 @@ class Checker(AbstractVisitor):
         if node.identifier.symbol is None:
             return
 
-        # type inference: return type of function = return type of body
         if node.body.return_type is None:
             node.body.return_type = NilTypeNode(node.position)
+        else:
+            # ensure the main body of the function returns a value
+            # TODO: control flow analysis to make this unnecessary if all branches return
+            if not node.body.return_type.is_assignable_to(NilTypeNode(0)) and not any(isinstance(statement, ReturnStatementNode) for statement in node.body.statements):
+                self.module.diagnostics.emit_diagnostic(
+                    'error', 'analysis: function must return a value', node.position)
 
         parameter_types = [parameter.type for parameter in node.parameters]
         node.identifier.symbol.type = FunctionTypeNode(node.position, parameter_types, node.body.return_type)
