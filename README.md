@@ -40,4 +40,4 @@ To generate a coverage report, invoke `$ python -m coverage run -m unittest disc
 The *tmLanguage* can be found [here](/.vscode/matty-syntax/syntaxes/mtl.tmLanguage.json).
 
 ## Development Plan
-See: [TODO.md](/TODO.md) and [grammar.ebnf](/doc/grammar.ebnf)
+See: [TODO.md](/TODO.md) and [grammar.ebnf](/docs/grammar.ebnf)
