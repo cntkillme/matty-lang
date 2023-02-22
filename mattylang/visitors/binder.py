@@ -25,13 +25,20 @@ class Binder(AbstractVisitor):
         super().visit_chunk(node)  # visit children
 
         # handle undefined references
-        for identifier in self.__undefined_references:
+        for identifier, scope in self.__undefined_references.items():
             # allow a function to reference itself (recursion)
             function_definition = identifier.get_enclosing_function()
 
             if function_definition is not None and function_definition.identifier.value == identifier.value:
                 symbol = function_definition.identifier.symbol
                 if symbol:
+                    identifier.symbol = symbol
+                    symbol.references.append(identifier)
+
+            # allow a function to reference external functions
+            if identifier.symbol is None:
+                symbol = scope.lookup(identifier.value, True, ignore_boundary=True)
+                if symbol is not None and symbol.node is not None and isinstance(symbol.node, FunctionDefinitionNode):
                     identifier.symbol = symbol
                     symbol.references.append(identifier)
 
