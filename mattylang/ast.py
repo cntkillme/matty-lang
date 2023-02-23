@@ -155,7 +155,7 @@ class ContinueStatementNode(StatementNode):
 class FunctionDefinitionNode(StatementNode):
     def __init__(self, position: int, identifier: 'IdentifierNode', parameters: List['FunctionParameterNode'], body: ChunkNode):
         super().__init__(position)
-        self.identifier, self.parameters, self.body = identifier, parameters, body
+        self.identifier, self.parameters, self.body, self.scope = identifier, parameters, body, body.parent
         identifier.parent, body.parent = self, self
         for parameter in parameters:
             parameter.parent = self

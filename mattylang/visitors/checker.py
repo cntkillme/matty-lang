@@ -13,17 +13,6 @@ class Checker(AbstractVisitor):
 
     def visit_chunk(self, node: ChunkNode):
         super().visit_chunk(node)  # visit children
-        parent = node.parent_chunk
-
-        # type inference: return type of function = return type of body
-        # merge chunk return types excluding function body/top level scope
-        if parent is not None:
-            if parent.return_type is None:
-                parent.return_type = node.return_type
-            elif node.return_type is not None:
-                if not node.return_type.is_assignable_to(parent.return_type):
-                    self.module.diagnostics.emit_diagnostic(
-                        'error', f'analysis: incompatible return type {node.return_type}, expected {parent.return_type}', node.return_type.position)
 
         # handle untyped nodes again (for recursion)
         for identifier in self.__untyped_references:
@@ -53,7 +42,6 @@ class Checker(AbstractVisitor):
 
     def visit_variable_assignment(self, node: VariableAssignmentNode):
         super().visit_variable_assignment(node)  # visit children
-        node.identifier.type = node.value.type
         identifier_type, value_type = node.identifier.type, node.value.type
 
         if identifier_type is None or value_type is None:
@@ -186,30 +174,30 @@ class Checker(AbstractVisitor):
 
         if not call_type.is_equivalent(symbol.type):
             self.module.diagnostics.emit_diagnostic(
-                'error', f'analysis: incompatible types for call, expected {symbol.type} (got {call_type})', node.position)
+                'error', f'analysis: incompatible arguments for function call, expected signature {symbol.type}, got {call_type}', node.position)
 
     def visit_unary_expression(self, node: UnaryExpressionNode):
         super().visit_unary_expression(node)  # visit children
         operator, value_type = node.operator, node.operand.type
+        type_error = False
+
         if value_type is None:
             return
 
         if operator == '-':
-            if not value_type.is_equivalent(RealTypeNode(0)):
-                self.module.diagnostics.emit_diagnostic(
-                    'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
-                return
-
             node.type = value_type
+            if not value_type.is_equivalent(RealTypeNode(0)):
+                type_error = True
         elif operator == '!':
-            if not value_type.is_equivalent(BoolTypeNode(0)):
-                self.module.diagnostics.emit_diagnostic(
-                    'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
-                return
-
             node.type = BoolTypeNode(position=node.position)
-        else:
+            if not value_type.is_equivalent(BoolTypeNode(0)):
+                type_error = True
+        else:  # pragma: no cover
             assert False, f'unary operator {operator} is invalid'  # lexer invariant: all unary operators are valid
+
+        if type_error:
+            self.module.diagnostics.emit_diagnostic(
+                'error', f'analysis: incompatible operand type for expression: {operator}{value_type}', node.position)
 
     def visit_binary_expression(self, node: BinaryExpressionNode):
         super().visit_binary_expression(node)  # visit children
@@ -217,35 +205,30 @@ class Checker(AbstractVisitor):
         left, right = node.left, node.right
         left_type, right_type = left.type, right.type
 
-        # Another diagnostic should have been emitted for if it has no type.
         if left_type is None or right_type is None:
             return
 
         type_error = not left_type.is_equivalent(right_type)
-        result_type = left_type
 
         if operator == '+':
-            result_type = left_type
+            node.type = left_type
             type_error = type_error or not (left_type.is_assignable_to(RealTypeNode(0))
                                             or left_type.is_assignable_to(StringTypeNode(0)))
         elif operator in {'-', '*', '/', '%'}:
-            result_type = left_type
+            node.type = left_type
             type_error = type_error or not left_type.is_assignable_to(RealTypeNode(0))
         elif operator in {'==', '!='}:
-            result_type = BoolTypeNode(node.position)
+            node.type = BoolTypeNode(node.position)
         elif operator in {'<', '<=', '>', '>='}:
-            result_type = BoolTypeNode(node.position)
+            node.type = BoolTypeNode(node.position)
             type_error = type_error or not (left_type.is_assignable_to(RealTypeNode(0))
                                             or left_type.is_assignable_to(StringTypeNode(0)))
         elif operator in {'||', '&&'}:
-            result_type = BoolTypeNode(node.position)
+            node.type = BoolTypeNode(node.position)
             type_error = type_error or not left_type.is_assignable_to(BoolTypeNode(0))
-        else:
+        else:  # pragma: no cover
             assert False, f'binary operator {operator} is invalid'  # lexer invariant: all binary operators are valid
 
         if type_error:
             self.module.diagnostics.emit_diagnostic(
                 'error', f'analysis: incompatible operand types for expression: {left_type} {operator} {right_type}', node.position)
-            return
-
-        node.type = result_type

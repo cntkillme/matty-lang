@@ -83,7 +83,7 @@ class Binder(AbstractVisitor):
         for parameter in node.parameters:
             parameter.accept(self)
         node.body.accept(self)
-        node.body.scope = self.__active_scope  # update function body's scope to include parameters
+        node.body.parent_chunk = None  # reset parent chunk
         self.__active_scope = self.__active_scope.close_scope()
 
     def visit_function_parameter(self, node: 'FunctionParameterNode'):
