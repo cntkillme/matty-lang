@@ -179,7 +179,6 @@ class Checker(AbstractVisitor):
                 'error', f'analysis: expected function type when calling {symbol.name}, got {symbol.type}', node.position)
             return
 
-        # TODO: support recursion
         argument_types: List[TypeNode] = [argument.type or AnyTypeNode(
             position=argument.position) for argument in node.arguments]
         call_type = FunctionTypeNode(node.position, argument_types, AnyTypeNode(position=node.position))

@@ -47,6 +47,8 @@ class Binder(AbstractVisitor):
                 self.module.diagnostics.emit_diagnostic(
                     'error', f'analysis: undefined reference to {identifier.value}', identifier.position)
 
+        self.__undefined_references.clear()
+
         # exit scope
         self.__parent_chunk = node.parent_chunk
         self.__active_scope = self.__active_scope.close_scope()

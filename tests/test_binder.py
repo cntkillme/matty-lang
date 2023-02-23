@@ -39,7 +39,6 @@ class BinderTest(unittest.TestCase):
 
         module = Module('test', '', globals=Globals().globals)
         ast.accept(Binder(module))
-        module.print_diagnostics()
         self.assertEqual(len(module.diagnostics), 0)
 
         # all identifiers have symbols
