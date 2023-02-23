@@ -1,5 +1,6 @@
 from mattylang.ast import *
 from mattylang.module import Module
+from mattylang.symbols import SymbolTable
 from mattylang.visitor import AbstractVisitor
 
 
@@ -145,34 +146,31 @@ class AstPrinter(AbstractVisitor):
             self.__write(f'- type: {node.type}')
 
 
-class SymbolPrinter(AbstractVisitor):
+class SymbolPrinter:
     def __init__(self, module: Module, indent: int = 0):
         super().__init__()
         self.module = module
         self.__indent = indent
+        self.__write_scope(module.globals)
 
-        # write global symbols first
-        for symbol in module.globals.variables.values():
-            self.__write(str(symbol))
+    def __write(self, text: str):
+        print('  ' * self.__indent + text)
 
-    def visit_chunk(self, node: ChunkNode):
-        if isinstance(node.parent, FunctionDefinitionNode):
+    def __write_scope(self, scope: SymbolTable):
+        if scope.boundary:
             self.__write('{')
 
-        self.__indent += 1
-        assert node.scope is not None, 'fatal: chunk node has no scope, was the binder run?'
-
-        for symbol in node.scope.variables.values():
+        for symbol in scope.variables.values():
             if symbol.node:
                 line, column = self.module.line_map.get_location(symbol.node.position)
                 self.__write(f'{str(symbol)} <{line}, {column}>')
             else:
                 self.__write(str(symbol))
 
-        super().visit_chunk(node)
-        self.__indent -= 1
-        if isinstance(node.parent, FunctionDefinitionNode):
-            self.__write('}')
+        for child in scope.children:
+            self.__indent += 1
+            self.__write_scope(child)
+            self.__indent -= 1
 
-    def __write(self, text: str):
-        print('  ' * self.__indent + text)
+        if scope.boundary:
+            self.__write('}')

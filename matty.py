@@ -51,7 +51,7 @@ def run(args: argparse.Namespace, file: str, source: str, no_file_output: bool =
         result.ast.accept(AstPrinter(result.module))
 
     if args.symbols:
-        result.ast.accept(SymbolPrinter(result.module))
+        SymbolPrinter(result.module)
 
     if args.code and result.code is not None:
         print(result.code)
