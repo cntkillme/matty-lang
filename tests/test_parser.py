@@ -235,7 +235,7 @@ class TestParser(unittest.TestCase):
         Parser(Lexer(module)).parse()
 
         # compare diagnostics
-        if len(module.diagnostics) > len(expected):
+        if len(module.diagnostics) > len(expected):  # pragma: no cover
             expected += [('', '')] * (len(module.diagnostics) - len(expected))
 
         result = [(diagnostic.kind, expected[idx][1] if diagnostic.message.find(expected[idx][1]) != -
