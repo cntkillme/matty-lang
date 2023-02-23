@@ -348,7 +348,7 @@ class AnyTypeNode(TypeNode):
         return 'Any'
 
     def accept(self, visitor: 'AbstractVisitor') -> None:
-        assert False, 'fatal: any type should not be visited'
+        visitor.visit_any_type(self)
 
     def is_assignable_to(self, other: TypeNode):
         return True

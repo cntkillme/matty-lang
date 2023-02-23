@@ -21,7 +21,7 @@
 		},
 		{
 			"name": "keyword.control.mtl",
-			"match": "\\b(def|if|else|while|break|continue|pass|return)\\b"
+			"match": "\\b(def|if|else|while|break|continue|return)\\b"
 		},
 		{
 			"name": "string.quoted.mtl",

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import List, Optional, Tuple
 
 from mattylang.ast import *
 from mattylang.module import Module
@@ -11,7 +11,7 @@ class Binder(AbstractVisitor):
         self.module = module
         self.__active_scope = module.globals
         self.__parent_chunk: Optional[ChunkNode] = None
-        self.__undefined_references: Dict[IdentifierNode, SymbolTable] = {}
+        self.__undefined_references: List[Tuple[IdentifierNode, SymbolTable]] = []
 
     def visit_chunk(self, node: ChunkNode):
         assert node.scope is None, f'fatal: {node} already has symbol table: {node.scope}'
@@ -25,7 +25,7 @@ class Binder(AbstractVisitor):
         super().visit_chunk(node)  # visit children
 
         # handle undefined references
-        for identifier, scope in self.__undefined_references.items():
+        for identifier, scope in self.__undefined_references:
             # allow a function to reference itself (recursion)
             function_definition = identifier.get_enclosing_function()
 
@@ -35,12 +35,13 @@ class Binder(AbstractVisitor):
                     identifier.symbol = symbol
                     symbol.references.append(identifier)
 
-            # allow a function to reference external functions
+            # allow a function to reference previously defined functions and external variables
             if identifier.symbol is None:
                 symbol = scope.lookup(identifier.value, True, ignore_boundary=True)
-                if symbol is not None and symbol.node is not None and isinstance(symbol.node, FunctionDefinitionNode):
-                    identifier.symbol = symbol
-                    symbol.references.append(identifier)
+                if symbol is not None:
+                    if symbol.extern or (symbol.node is not None and isinstance(symbol.node, FunctionDefinitionNode)):
+                        identifier.symbol = symbol
+                        symbol.references.append(identifier)
 
             if identifier.symbol is None:
                 self.module.diagnostics.emit_diagnostic(
@@ -88,7 +89,7 @@ class Binder(AbstractVisitor):
         symbol = self.__active_scope.lookup(node.identifier.value, False)
         if symbol is not None:
             self.module.diagnostics.emit_diagnostic(
-                'error', f'analysis: duplicate definition of {node.identifier.value}', node.identifier.position)
+                'error', f'analysis: duplicate parameter {node.identifier.value}', node.identifier.position)
 
         node.type.accept(self)
 
@@ -99,14 +100,13 @@ class Binder(AbstractVisitor):
 
     # binds symbols to identifiers
     def visit_identifier(self, node: IdentifierNode):
-        if node.value == '#invalid':
-            return
-
         assert node.symbol is None, f'fatal: {node} already has symbol: {node.symbol}'
-        symbol = self.__active_scope.lookup(node.value, True)
 
-        if symbol is not None:
-            node.symbol = symbol
-            symbol.references.append(node)
-        else:
-            self.__undefined_references[node] = self.__active_scope
+        if node.value != '#invalid':
+            symbol = self.__active_scope.lookup(node.value, True)
+
+            if symbol is not None:
+                node.symbol = symbol
+                symbol.references.append(node)
+            else:
+                self.__undefined_references.append((node, self.__active_scope))

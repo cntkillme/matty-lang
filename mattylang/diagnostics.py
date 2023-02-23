@@ -25,6 +25,7 @@ class Diagnostic:
 class Diagnostics:
     def __init__(self, verbose: bool) -> None:
         self.__diagnostics: List[Diagnostic] = []
+        self.__last_block = 0
         self.__has_error = False
         self.__verbose = verbose
 
@@ -37,12 +38,16 @@ class Diagnostics:
     def has_error(self):
         return self.__has_error
 
-    def sort(self):
-        self.__diagnostics.sort(key=lambda diagnostic: diagnostic.position)
-
-    def emit_diagnostic(self, kind: DiagnosticKind, message: str, position: int = -1):
+    def emit_diagnostic(self, kind: DiagnosticKind, message: str, position: int):
         if kind == 'info' and not self.__verbose:
             return
         elif kind == 'error':
             self.__has_error = True
         self.__diagnostics.append(Diagnostic(kind, message, position))
+
+    def next_set(self):
+        # sort diagnostics in current set by position
+        idx = len(self.__diagnostics)
+        self.__diagnostics[self.__last_block:idx] = sorted(
+            self.__diagnostics[self.__last_block:idx], key=lambda diagnostic: diagnostic.position)
+        self.__last_block = idx

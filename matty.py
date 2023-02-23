@@ -45,7 +45,7 @@ def run(args: argparse.Namespace, file: str, source: str, no_file_output: bool =
             print(f'{file}:{line}:{column}: {lexer.peek()}')
             lexer.scan()
 
-    result = compile(file, source, verbose=args.verbose, parse_only=args.parse_only, globals=Globals().globals)
+    result = compile(file, source, verbose=args.verbose, no_check=args.parse_only, globals=Globals().globals)
 
     if args.syntax:
         result.ast.accept(AstPrinter(result.module))

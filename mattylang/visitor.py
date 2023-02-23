@@ -86,6 +86,9 @@ class AbstractVisitor(ABC):
         node.left.accept(self)
         node.right.accept(self)
 
+    def visit_any_type(self, node: 'AnyTypeNode'):
+        pass
+
     def visit_nil_type(self, node: 'NilTypeNode'):
         pass
 
