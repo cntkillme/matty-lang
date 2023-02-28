@@ -2,6 +2,8 @@
 [![ci](https://github.com/cntkillme/matty-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/cntkillme/matty-lang/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/cntkillme/matty-lang/branch/main/graph/badge.svg?token=16KFKQURM6)](https://codecov.io/gh/cntkillme/matty-lang)
 
+## Capstone Presentation
+Video: [https://www.youtube.com/watch?v=UI8qgSn6Xs0](https://www.youtube.com/watch?v=UI8qgSn6Xs0)
 
 ## Introduction
 MattyLang is a statically typed programming language designed to explore compiler construction and type systems.
