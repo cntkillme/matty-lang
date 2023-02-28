@@ -15,16 +15,14 @@
 	- Documentation	Improvements
 	- Tests
 - Future Plans (subject to change)
-	- MattyLang runtime
-	- Variable and function declarations
-	- Closures, lambdas
-	- Real literal expansion (scientific notation)
-	- String literal expansion (string escape sequences, string interpolation)
-	- Integer type and literals
-	- Arrays and subscript expression
 	- Module imports/exports
 	- Compound types and tuples
-	- Type aliasing
-	- Command-line arguments
-	- Standard library
+	- MattyLang runtime, and have the emitter generate bytecode
+	- MattyLang standard library
+	- Function declarations (to allow for mutual recursion)
+	- Closures and lambdas
+	- Integer type, literals, and bitwise operations
+	- Arrays and subscript expression
+	- Real literal expansion (scientific notation)
+	- String literal expansion (string escape sequences, string interpolation)
 	- ...

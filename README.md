@@ -7,7 +7,7 @@
 MattyLang is a statically typed programming language designed to explore compiler construction and type systems.
 
 ## Usage
-See `$ ./matty.py help`, quick start: `$ ./matty.py --syntax examples/v0.0.1.mtl`.
+See `$ ./matty.py help`, quick start: `$ ./matty.py examples/v1.0.mtl`. To enter REPL mode, do not specify a file.
 
 ```
 usage: matty.py [-h] [-o OUTPUT] [-V] [-v] [--tokens] [--syntax] [--symbols] [--code] [file]

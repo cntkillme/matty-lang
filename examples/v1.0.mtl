@@ -1,0 +1,41 @@
+# v1.0.mtl
+
+def recursive_fib(n: Real) {
+    if (n <= 1)
+        return 1
+    return recursive_fib(n - 1) + recursive_fib(n - 2)
+}
+
+def iterative_fib(n: Real) {
+    if (n <= 1)
+        return 1
+    def a = 1 # fib(i-1)
+    def b = 1 # fib(i)
+    while (n > 1) {
+        def c = a + b
+        a = b
+        b = c
+        n = n - 1
+    }
+    return b
+}
+
+print(recursive_fib(5)) # 8
+print(iterative_fib(5)) # 8
+
+def apply_if(f: (Real, Real) -> Real, condition: (Real, Real) -> Bool, x: Real, y: Real) {
+    if (condition(x, y))
+        return f(x, y)
+    return 0
+}
+
+def add(x: Real, y: Real) {
+    return x + y
+}
+
+def both_positive(x: Real, y: Real) {
+    return x > 0 && y > 0
+}
+
+print(apply_if(add, both_positive, 5, 10)) # 15
+print(apply_if(add, both_positive, -5, 10)) # 0

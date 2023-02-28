@@ -1,5 +1,5 @@
-def PI = 3.141592654
 # v0.3.mtl
+def PI = 3.141592654
 
 def fib(n: Real) {
 	if (n > 1)
